@@ -14,15 +14,14 @@ func main() {
     log.Fatalln(err)
   }
   backupPathPrefix := os.Args[2]
+  afterPartProgram := os.Args[3]
 
   i := 0
 
-  os.Exit(0)
-
   eof := false
   for !eof {
+    log.Println("commencing part ",i)
     partPath := backupPathPrefix+"_part"+strconv.Itoa(i)
-    log.Println(partPath)
 
     rd, wr := io.Pipe()
     cmd := exec.Command("zbackup", "backup", partPath)
@@ -48,6 +47,14 @@ func main() {
 
     err = cmd.Wait()
 
+    if err != nil {
+      log.Fatalln(err)
+    }
+
+    after := exec.Command(afterPartProgram, backupPathPrefix, strconv.Itoa(i))
+    after.Stdout = os.Stdout
+    after.Stderr = os.Stderr
+    err = after.Run()
     if err != nil {
       log.Fatalln(err)
     }

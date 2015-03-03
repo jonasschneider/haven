@@ -10,7 +10,8 @@ archive() {
   tar c $SOURCE
 }
 
-chunksize=1025
+chunksize=$((1024 * 10000))
 
-archive | go run zbackup-splitter/main.go $chunksize $TARGET
+archive | go run zbackup-splitter/main.go $chunksize $TARGET runner/after_part
 archive | zbackup backup $TARGET
+runner/after_part $TARGET

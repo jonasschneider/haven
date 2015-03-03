@@ -1,0 +1,18 @@
+#!/bin/bash
+
+set -eux
+
+backup=$1
+bundles="$(dirname $backup)/../bundles"
+
+# show the current size of the bundles
+echo "du: $(tar c $bundles|wc -c)"
+
+# simulate moving away all the bundles (i.e. archiving to S3)
+archive="$bundles/../archived_bundles"
+mkdir -p $archive
+pushd $bundles
+pax -rwl . $archive
+popd
+rm $bundles/*/*
+rmdir $bundles/*

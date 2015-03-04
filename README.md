@@ -11,13 +11,12 @@ Assumptions about your environment:
 - Dataset < ~10TB
 - Recommended: Source data is a ZFS dataset (for snapshotting)
 
-Backup strategy 1:
+Backup strategy A:
 - Cronjob
 - Duplicity
-- node-hubic-swiftauth
 - [HubiC](https://hubic.com/en/offers/) is a cloud storage product from European hosting company OVH offering 10TB of OpenStack Swift object storage for 10€/month
 
-Backup strategy 2:
+Backup strategy B:
 - Cronjob (TODO: should we treat cron as a SPOF? Maybe do something like https://addons.heroku.com/deadmanssnitch)
 - ZBackup
 - Google Drive (or maybe Glacier)

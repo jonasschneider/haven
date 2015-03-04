@@ -1,0 +1,33 @@
+#!/bin/sh
+
+set -eux
+
+spec=$1
+name=$2
+restore_to=$3
+gdrive_folder=$(cat $spec | jq --raw-output .gdrive_folder_id)
+
+if [ -e "$restore_to" ]
+then
+  echo "$restore_to already exists!"
+  exit 1
+fi
+
+tmp=$(mktemp -d /tmp/haven-restoreXXXXX)
+pushd $tmp
+go run ~/code/haven/gdriverestore/main.go $gdrive_folder
+popd $tmp
+
+if [ -e "$restore_to" ]
+then
+  echo "$restore_to already exists!"
+  exit 1
+fi
+mkdir $restore_to
+
+mv $tmp/{archived_bundles,bundles}
+
+pushd $restore_to
+zbackup restore $tmp/backups/$name | tar x
+chown -R jonas:staff *
+popd

@@ -98,7 +98,7 @@ func main() {
         if err != nil { log.Fatalln(err) }
       }
 
-      err = os.MkdirAll(filepath.Dir(path), os.ModeDir)
+      err = os.MkdirAll(filepath.Dir(path), 0700)
       if err != nil { log.Fatalln("mkdir for",path,"returned",err) }
 
       // everything is well, move file into place

@@ -38,20 +38,33 @@ func main() {
       log.Fatalln(err)
     }
 
-    for {
+    zbackup := make(chan error)
+    go func() {
+      zbackup <- cmd.Wait()
+    }()
+    ioerr := make(chan error)
+
+    part_loop: for {
       log.Println("feeding",next_n)
-      n, err := io.CopyN(wr, os.Stdin, next_n)
-      if err != nil {
-        if err == io.EOF {
-          log.Println("input EOF")
-          eof = true
-          break
-        } else {
-          log.Fatalln(err)
+
+      go func() {
+        _, err := io.CopyN(wr, os.Stdin, next_n)
+        ioerr <- err
+      }()
+
+      select {
+      case err := <-zbackup:
+        log.Println("zbackup exited unexpectedly:",err)
+      case err := <-ioerr:
+        if err != nil {
+          if err == io.EOF {
+            log.Println("input EOF")
+            eof = true
+            break part_loop
+          } else {
+            log.Fatalln(err)
+          }
         }
-      }
-      if n != next_n {
-        log.Println("short read of",n)
       }
 
       out, err := exec.Command("du", "-s", "-k", filepath.Dir(backupPathPrefix)+"/../tmp").Output()
@@ -77,8 +90,9 @@ func main() {
 
     log.Println("part",i,"is complete")
 
+    // commit this part to zbackup and wait for it to exit
     wr.Close()
-    err = cmd.Wait()
+    err = <-zbackup
 
     if err != nil {
       log.Fatalln(err)

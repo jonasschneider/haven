@@ -39,7 +39,7 @@ syncpid=$!
 popd
 echo $syncpid > $syncpidfile
 
-archive | PWFILE="$pwfile" haven-b-zbackup-splitter $((1024 * 1000)) $zbackup_file haven-b-archive-bundles
+archive | PWFILE="$pwfile" haven-b-zbackup-splitter $((1024 * 5000)) $zbackup_file haven-b-archive-bundles
 archive | zbackup backup --password-file $pwfile $zbackup_file
 haven-b-archive-bundles $zbackup_file
 

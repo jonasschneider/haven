@@ -54,7 +54,7 @@ func main() {
 
       select {
       case err := <-zbackup:
-        log.Println("zbackup exited unexpectedly:",err)
+        log.Fatalln("zbackup exited unexpectedly:",err)
       case err := <-ioerr:
         if err != nil {
           if err == io.EOF {

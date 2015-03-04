@@ -30,8 +30,12 @@ mkdir $restore_to
 
 mv $tmp/{archived_bundles,bundles}
 
+pwfile=$(mktemp /tmp/haven-pwXXXXX)
+echo $(cat $spec | jq --raw-output .zbackup_password) > $pwfile
+
 pushd $restore_to
-zbackup restore $tmp/backups/$name | tar x
+zbackup restore --password-file $pwfile $tmp/backups/$name | tar x
+rm $pwfile
 # fix file ownership: restore to the current user and effective group id
 chown -R `whoami`:`id -Gn|cut -d ' ' -f 1` *
 popd

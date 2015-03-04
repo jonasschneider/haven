@@ -1,0 +1,23 @@
+#!/bin/bash
+
+set -eux
+
+repo_path=$1
+gdrive_folder_id=$2
+
+password=$(cat /dev/random | LC_CTYPE=c tr -dc A-Za-z0-9 | head -c 100)
+set -o pipefail
+pwfile=$(mktemp /tmp/haven-pwXXXXX)
+echo $password > $pwfile
+
+zbackup --password-file $pwfile init $repo_path
+rm $pwfile
+
+cat <<END
+{
+  "local_repo": "$repo_path",
+  "zbackup_info_base64": "$(base64 $repo_path/info)",
+  "gdrive_folder_id": "$gdrive_folder_id",
+  "zbackup_password": "$password"
+}
+END

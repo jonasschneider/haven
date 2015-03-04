@@ -5,15 +5,18 @@ set -o pipefail
 shopt -s dotglob
 
 spec=$1
-name=$2
+sourcedir=$2
+name=$3
 
-SOURCE=$(cat $spec | jq --raw-output .source)
 repo=$(cat $spec | jq --raw-output .local_repo)
 zbackup_file=$repo/backups/$name
 gdrive_folder=$(cat $spec | jq --raw-output .gdrive_folder_id)
 
+pwfile=$(mktemp /tmp/haven-pwXXXXX)
+echo $(cat $spec | jq --raw-output .zbackup_password) > $pwfile
+
 archive() {
-  cd $SOURCE
+  cd $sourcedir
   tar c *
 }
 
@@ -27,9 +30,11 @@ anywait() {
 
 chunksize=$((1024 * 1000))
 
-archive | SYNC_CMD="go run /Users/jonas/code/haven/gdrivesync/main.go --archive-and-delete $gdrive_folder" go run zbackup-splitter/main.go $chunksize $zbackup_file bin/after_part
-archive | zbackup backup $zbackup_file
+archive | PWFILE=$pwfile SYNC_CMD="go run /Users/jonas/code/haven/gdrivesync/main.go --archive-and-delete $gdrive_folder" go run zbackup-splitter/main.go $chunksize $zbackup_file bin/after_part
+archive | zbackup backup --password-file $pwfile $zbackup_file
 bin/after_part $zbackup_file
+
+rm $pwfile
 
 echo "Backup done, waiting for Google Drive sync to finish"
 

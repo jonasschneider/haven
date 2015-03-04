@@ -28,7 +28,7 @@ func main() {
     partPath := backupPathPrefix+"_part"+strconv.Itoa(i)
 
     rd, wr := io.Pipe()
-    cmd := exec.Command("zbackup", "backup", partPath)
+    cmd := exec.Command("zbackup", "--password-file", os.Getenv("PWFILE"), "backup", partPath)
     cmd.Stdin = rd
     cmd.Stdout = os.Stdout
     cmd.Stderr = os.Stderr

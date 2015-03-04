@@ -1,15 +1,26 @@
 #!/bin/bash
 
+
 set -eux
 
-#repo=$(mktemp -d /tmp/haven-testXXXXX)
-repo=/tmp/test
+repo=$(mktemp -d /tmp/haven-testXXXXX)
+#repo=/tmp/test
 
 # initialize the repo
-#zbackup --non-encrypted init $repo
+zbackup --non-encrypted init $repo
+
+gdrive_folder_id=$(gdrive folder -t "haven-test $(date)"|grep Id:|cut -d ' ' -f 2)
+
+cat > $repo/backupspec.json <<END
+{
+  "source": "test/data",
+  "z_backupfile": "$repo/backups/mybackup",
+  "gdrive_folder_id": "$gdrive_folder_id"
+}
+END
 
 # do the backup
-runner/main.sh /Users/jonas/Pictures/2014 $repo/backups/mybackup5 | tee $repo/buplog
+runner/main.sh $repo/backupspec.json | tee $repo/buplog
 
 # compare the restored data
 rmdir $repo/bundles

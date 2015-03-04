@@ -1,4 +1,4 @@
-#!/bin/sh
+#!/bin/bash
 
 set -eux
 shopt -s dotglob
@@ -7,7 +7,7 @@ spec=$1
 name=$2
 
 SOURCE=$(cat $spec | jq --raw-output .source)
-repo=$(cat $spec | jq --raw-output .repo)
+repo=$(cat $spec | jq --raw-output .local_repo)
 zbackup_file=$repo/backups/$name
 gdrive_folder=$(cat $spec | jq --raw-output .gdrive_folder_id)
 
@@ -18,9 +18,12 @@ archive() {
 
 chunksize=$((1024 * 1000))
 
-archive | go run zbackup-splitter/main.go $chunksize $zbackup_file runner/after_part
+archive | go run zbackup-splitter/main.go $chunksize $zbackup_file bin/after_part
 archive | zbackup backup $zbackup_file
-runner/after_part $zbackup_file
+bin/after_part $zbackup_file
 pushd $repo
+# archive the bundles, this could run in the background
+go run ~/code/haven/gdrivesync/main.go --archive-and-delete $gdrive_folder
+# finally, archive the metadata
 go run ~/code/haven/gdrivesync/main.go $gdrive_folder
 popd

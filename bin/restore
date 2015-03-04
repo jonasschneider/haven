@@ -1,4 +1,4 @@
-#!/bin/sh
+#!/bin/bash
 
 set -eux
 
@@ -29,5 +29,6 @@ mv $tmp/{archived_bundles,bundles}
 
 pushd $restore_to
 zbackup restore $tmp/backups/$name | tar x
-chown -R jonas:staff *
+# fix file ownership: restore to the current user and effective group id
+chown -R `whoami`:`id -Gn|cut -d ' ' -f 1` *
 popd

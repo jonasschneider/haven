@@ -28,6 +28,10 @@ func visit(path string, f os.FileInfo, err error) error {
   if f.IsDir() || strings.Contains(path, "AppleDouble") || path == "gdrivesync-state.boltdb" {
     return nil
   }
+
+  if *archiving && !strings.HasPrefix(path, "archived_bundles/") {
+    return nil
+  }
   fmt.Printf("Visited: %s\n", path)
 
   q := "'"+parent+"' in parents and title='"+path+"'"
@@ -72,16 +76,21 @@ func visit(path string, f os.FileInfo, err error) error {
   })
   if err != nil { log.Fatalln(err) }
 
-  // the file is uploaded, we can remove it locally
-  err = os.Remove(path)
-  if err != nil { log.Fatalln(err) }
+  if *archiving {
+    log.Println("removing local copy of",path,"after successful upload")
+    // the file is uploaded, we can remove it locally
+    err = os.Remove(path)
+    if err != nil { log.Fatalln(err) }
+  }
 
   return nil
 }
 
 var db *bolt.DB
+var archiving *bool
 
 func main() {
+  archiving = flag.Bool("archive-and-delete", false, "Only visit archived_bundles/, but delete files after archiving")
   flag.Parse()
   parent = flag.Arg(0)
   if parent == "" {

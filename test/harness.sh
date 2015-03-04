@@ -2,13 +2,14 @@
 
 set -eux
 
-repo=$(mktemp -d /tmp/haven-testXXXXX)
+#repo=$(mktemp -d /tmp/haven-testXXXXX)
+repo=/tmp/test
 
 # initialize the repo
-zbackup --non-encrypted init $repo
+#zbackup --non-encrypted init $repo
 
 # do the backup
-runner/main.sh test/data $repo/backups/mybackup | tee $repo/buplog
+runner/main.sh /Users/jonas/Pictures/2014 $repo/backups/mybackup5 | tee $repo/buplog
 
 # compare the restored data
 rmdir $repo/bundles

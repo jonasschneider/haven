@@ -6,10 +6,12 @@ import (
   "io"
   "log"
   "strconv"
+  "path/filepath"
+  "strings"
 )
 
 func main() {
-  partSize, err := strconv.ParseInt(os.Args[1], 10, 64)
+  targetedPartSize, err := strconv.ParseInt(os.Args[1], 10, 64)
   if err != nil {
     log.Fatalln(err)
   }
@@ -20,6 +22,8 @@ func main() {
 
   eof := false
   for !eof {
+    next_n := targetedPartSize
+
     log.Println("commencing part ",i)
     partPath := backupPathPrefix+"_part"+strconv.Itoa(i)
 
@@ -34,17 +38,46 @@ func main() {
       log.Fatalln(err)
     }
 
-    _, err = io.CopyN(wr, os.Stdin, partSize)
-    if err != nil {
-      if err == io.EOF {
-        eof = true
-      } else {
+    for {
+      log.Println("feeding",next_n)
+      n, err := io.CopyN(wr, os.Stdin, next_n)
+      if err != nil {
+        if err == io.EOF {
+          log.Println("input EOF")
+          eof = true
+          break
+        } else {
+          log.Fatalln(err)
+        }
+      }
+      if n != next_n {
+        log.Println("short read of",n)
+      }
+
+      out, err := exec.Command("du", "-s", "-k", filepath.Dir(backupPathPrefix)+"/../tmp").Output()
+      if err != nil {
         log.Fatalln(err)
+      }
+      tmpSize, err := strconv.Atoi(strings.Fields(string(out))[0])
+      if err != nil {
+        log.Fatalln(err)
+      }
+      tmpSize = tmpSize * 1000
+      log.Println("tmp/ now at: ",tmpSize,"target", targetedPartSize)
+
+      next_n = targetedPartSize - int64(tmpSize)
+      if next_n <= 0 {
+        break
+      }
+      next_n *= 2
+      if next_n < 256*1024 {
+        next_n = 1024*1024
       }
     }
 
-    wr.Close()
+    log.Println("part",i,"is complete")
 
+    wr.Close()
     err = cmd.Wait()
 
     if err != nil {

@@ -20,22 +20,31 @@ cat > $tmp/backupspec.json <<END
 }
 END
 
-# do the backup
-runner/main.sh $tmp/backupspec.json firstbackup | tee $tmp/buplog
+# TEST: backup preserves file contents & metadata
+# runner/main.sh $tmp/backupspec.json firstbackup
+# runner/restore $tmp/backupspec.json firstbackup $tmp/rest
 
-# compare the restored data
-runner/restore $tmp/backupspec.json firstbackup $tmp/rest
+# expected=$(cd test/data; tar c * | sha1sum)
+# actual=$(cd $tmp/rest; tar c * | sha1sum)
+
+# if [ "$expected" != "$actual" ]; then
+#   echo expected $expected, but got $actual
+#   exit 1
+# fi
+
+# TEST: subsequent backups deduplicate
+runner/main.sh $tmp/backupspec.json firstbackup
+runner/main.sh $tmp/backupspec.json secondbackup
+runner/restore $tmp/backupspec.json secondbackup $tmp/rest
 
 expected=$(cd test/data; tar c * | sha1sum)
 actual=$(cd $tmp/rest; tar c * | sha1sum)
-
-cat $tmp/buplog|grep du:
-
-rm -fr $repo
 
 if [ "$expected" != "$actual" ]; then
   echo expected $expected, but got $actual
   exit 1
 fi
+
+rm -fr $tmp
 
 echo "all is well!"

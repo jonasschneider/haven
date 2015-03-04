@@ -23,16 +23,23 @@ archive() {
 # wait() for a specific PID
 anywait() {
   set +ex
-  while kill -0 "$1"; do
+  while kill -0 "$1" 2>/dev/null; do
       sleep 0.5
   done
   set -ex
 }
 
-chunksize=$((1024 * 1000))
+# Start syncing in the background
+syncpidfile="$repo/tmp/syncpid"
+mkdir -p $(dirname $syncpidfile)
+touch $syncpidfile
+pushd $repo
+EXIT_ON_ABSENT=$syncpidfile haven-b-gdrivesync --archive-and-delete $gdrive_folder &
+syncpid=$!
+popd
+echo $syncpid > $syncpidfile
 
-sync_cmd="haven-b-gdrivesync --archive-and-delete $gdrive_folder"
-archive | env PWFILE"=$pwfile" SYNC_CMD="$sync_cmd" haven-b-zbackup-splitter $chunksize $zbackup_file haven-b-archive-bundles
+archive | PWFILE="$pwfile" haven-b-zbackup-splitter $((1024 * 1000)) $zbackup_file haven-b-archive-bundles
 archive | zbackup backup --password-file $pwfile $zbackup_file
 haven-b-archive-bundles $zbackup_file
 
@@ -41,9 +48,7 @@ rm $pwfile
 echo "Backup done, waiting for Google Drive sync to finish"
 
 # wait for the sync to finish
-syncfile="$repo/tmp/syncpid"
-syncpid=$(cat $syncfile)
-rm $syncfile # this triggers the exit
+rm $syncpidfile # this triggers the exit
 anywait $syncpid
 
 pushd $repo
@@ -51,7 +56,7 @@ pushd $repo
 ls archived_bundles | xargs -I {} rmdir archived_bundles/{}
 rmdir bundles
 rmdir tmp
-mkdir bundles # could do it the other way, but zbackup gets confused if the folder is absent
+mkdir bundles # could also do it the other way and only create it before running backup
 
 echo "syncing metadata"
 # finally, archive the metadata

@@ -139,7 +139,7 @@ func archivingLoop() {
       return
     } else {
       log.Println("exit file",exitfile,"still present, sleeping for 5s before running again")
-      time.Sleep(10*time.Second)
+      time.Sleep(5*time.Second)
     }
   }
 }

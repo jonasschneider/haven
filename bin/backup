@@ -17,14 +17,27 @@ archive() {
   tar c *
 }
 
+anywait() {
+  set +e
+  while kill -0 "$1"; do
+      sleep 0.5
+  done
+  set -e
+}
+
 chunksize=$((1024 * 1000))
 
-archive | go run zbackup-splitter/main.go $chunksize $zbackup_file bin/after_part
+archive | SYNC_CMD="go run /Users/jonas/code/haven/gdrivesync/main.go --archive-and-delete $gdrive_folder" go run zbackup-splitter/main.go $chunksize $zbackup_file bin/after_part
 archive | zbackup backup $zbackup_file
 bin/after_part $zbackup_file
+
+# wait for the sync to finish
+syncfile="$repo/tmp/syncpid"
+syncpid=$(cat $syncfile)
+rm $syncfile # this triggers the exit
+anywait $syncpid
+
 pushd $repo
-# archive the bundles, this could run in the background
-go run ~/code/haven/gdrivesync/main.go --archive-and-delete $gdrive_folder
 # finally, archive the metadata
 go run ~/code/haven/gdrivesync/main.go $gdrive_folder
 popd

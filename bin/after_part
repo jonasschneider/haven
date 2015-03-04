@@ -16,3 +16,17 @@ ls | xargs -I {} mkdir -p $archive/{}
 find . -type f | xargs -n 1 -I {} mv {} $archive/{}
 popd
 rmdir $bundles/* || true
+
+syncfile="$bundles/../tmp/syncpid"
+if [ -f $syncfile ]
+then
+  echo "sync already running -- not starting again"
+else
+  echo "starting sync"
+  mkdir -p $(dirname $syncfile)
+  touch $syncfile
+  pushd $bundles/..
+  EXIT_ON_ABSENT=$syncfile $SYNC_CMD &
+  popd
+  echo $! > $syncfile
+fi

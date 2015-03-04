@@ -10,6 +10,7 @@ import (
   "strings"
   "regexp"
   "encoding/json"
+  "time"
 
   "github.com/boltdb/bolt"
 )
@@ -25,7 +26,7 @@ type FileManifest struct {
 }
 
 func visit(path string, f os.FileInfo, err error) error {
-  if f.IsDir() || strings.Contains(path, "AppleDouble") || path == "gdrivesync-state.boltdb" || path == "info" {
+  if f.IsDir() || strings.Contains(path, "AppleDouble") || path == "gdrivesync-state.boltdb" || path == "info" || strings.HasPrefix(path, "tmp/") {
     return nil
   }
 
@@ -107,6 +108,35 @@ func main() {
   })
   if err != nil { log.Fatalln(err) }
 
-  err = filepath.Walk(".", visit)
-  if err != nil { log.Fatalln(err) }
+  if *archiving {
+    // loop until there are no background changes
+    archivingLoop()
+  } else {
+    // just do a single pass
+    err = filepath.Walk(".", visit)
+    if err != nil { log.Fatalln(err) }
+  }
+}
+
+
+func archivingLoop() {
+  exitfile := os.Getenv("EXIT_ON_ABSENT")
+
+  for {
+    err := filepath.Walk(".", visit)
+    if err != nil { log.Fatalln(err) }
+
+    _, err = os.Stat(exitfile)
+    if err != nil {
+      if !os.IsNotExist(err) {
+        log.Println("could not stat exitfile",exitfile)
+        log.Fatalln(err)
+      }
+      log.Println("exit file",exitfile,"is gone, i'm out")
+      return
+    } else {
+      log.Println("exit file",exitfile,"still present, sleeping for 5s before running again")
+      time.Sleep(10*time.Second)
+    }
+  }
 }

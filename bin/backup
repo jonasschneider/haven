@@ -31,6 +31,8 @@ archive | SYNC_CMD="go run /Users/jonas/code/haven/gdrivesync/main.go --archive-
 archive | zbackup backup $zbackup_file
 bin/after_part $zbackup_file
 
+echo "Backup done, waiting for Google Drive sync to finish"
+
 # wait for the sync to finish
 syncfile="$repo/tmp/syncpid"
 syncpid=$(cat $syncfile)
@@ -38,6 +40,7 @@ rm $syncfile # this triggers the exit
 anywait $syncpid
 
 pushd $repo
+rmdir tmp
 # finally, archive the metadata
 go run ~/code/haven/gdrivesync/main.go $gdrive_folder
 popd

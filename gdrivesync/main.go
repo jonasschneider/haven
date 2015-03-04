@@ -132,7 +132,10 @@ func archivingLoop() {
         log.Println("could not stat exitfile",exitfile)
         log.Fatalln(err)
       }
-      log.Println("exit file",exitfile,"is gone, i'm out")
+      log.Println("exit file",exitfile,"is gone, doing one last sweep")
+      err := filepath.Walk(".", visit)
+      if err != nil { log.Fatalln(err) }
+      log.Println("goodbye")
       return
     } else {
       log.Println("exit file",exitfile,"still present, sleeping for 5s before running again")

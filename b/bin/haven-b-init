@@ -5,7 +5,7 @@ set -eux
 repo_path=$1
 gdrive_folder_id=$2
 
-password=$(cat /dev/random | LC_CTYPE=c tr -dc A-Za-z0-9 | head -c 100)
+password=$(cat /dev/urandom | LC_CTYPE=c tr -dc A-Za-z0-9 | head -c 100)
 set -o pipefail
 pwfile=$(mktemp /tmp/haven-pwXXXXX)
 echo $password > $pwfile

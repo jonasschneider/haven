@@ -1,6 +1,7 @@
 #!/bin/bash
 
 set -eux
+set -o pipefail
 shopt -s dotglob
 
 tmp=$(mktemp -d /tmp/haven-testXXXXX)
@@ -16,6 +17,7 @@ cat > $tmp/backupspec.json <<END
 {
   "source": "test/data",
   "local_repo": "$repo",
+  "zbackup_info_base64": "$(base64 $repo/info)",
   "gdrive_folder_id": "$gdrive_folder_id"
 }
 END

@@ -25,7 +25,7 @@ type FileManifest struct {
 }
 
 func visit(path string, f os.FileInfo, err error) error {
-  if f.IsDir() || strings.Contains(path, "AppleDouble") || path == "gdrivesync-state.boltdb" {
+  if f.IsDir() || strings.Contains(path, "AppleDouble") || path == "gdrivesync-state.boltdb" || path == "info" {
     return nil
   }
 

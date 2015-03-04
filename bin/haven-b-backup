@@ -4,9 +4,9 @@ set -eux
 set -o pipefail
 shopt -s dotglob
 
-spec=$1
-sourcedir=$2
-name=$3
+spec="$1"
+sourcedir="$2"
+name="$3"
 
 repo=$(cat $spec | jq --raw-output .local_repo)
 zbackup_file=$repo/backups/$name
@@ -16,23 +16,25 @@ pwfile=$(mktemp /tmp/haven-pwXXXXX)
 echo $(cat $spec | jq --raw-output .zbackup_password) > $pwfile
 
 archive() {
-  cd $sourcedir
+  cd "$sourcedir"
   tar c *
 }
 
+# wait() for a specific PID
 anywait() {
-  set +e
+  set +ex
   while kill -0 "$1"; do
       sleep 0.5
   done
-  set -e
+  set -ex
 }
 
 chunksize=$((1024 * 1000))
 
-archive | PWFILE=$pwfile SYNC_CMD="go run /Users/jonas/code/haven/gdrivesync/main.go --archive-and-delete $gdrive_folder" go run zbackup-splitter/main.go $chunksize $zbackup_file bin/after_part
+sync_cmd="haven-b-gdrivesync --archive-and-delete $gdrive_folder"
+archive | env PWFILE"=$pwfile" SYNC_CMD="$sync_cmd" haven-b-zbackup-splitter $chunksize $zbackup_file haven-b-archive-bundles
 archive | zbackup backup --password-file $pwfile $zbackup_file
-bin/after_part $zbackup_file
+haven-b-archive-bundles $zbackup_file
 
 rm $pwfile
 
@@ -45,7 +47,13 @@ rm $syncfile # this triggers the exit
 anywait $syncpid
 
 pushd $repo
+# these are here mainly to assert that the dirs are empty
+ls archived_bundles | xargs -I {} rmdir archived_bundles/{}
+rmdir bundles
 rmdir tmp
+mkdir bundles # could do it the other way, but zbackup gets confused if the folder is absent
+
+echo "syncing metadata"
 # finally, archive the metadata
-go run ~/code/haven/gdrivesync/main.go $gdrive_folder
+haven-b-gdrivesync $gdrive_folder
 popd

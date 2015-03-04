@@ -1,4 +1,4 @@
-A complete backup toolkit for personal storage servers
+A set of procedures and tools for backing up personal storage servers
 
 - Multiple redundant offsite backups using different technologies & remote storage providers
   (Don't put all your eggs in one basket)

@@ -16,7 +16,7 @@ fi
 
 tmp=$(mktemp -d /tmp/haven-restoreXXXXX)
 pushd $tmp
-go run ~/code/haven/gdriverestore/main.go $gdrive_folder
+haven-b-gdriverestore $gdrive_folder
 # write out the info file (containing the backup key)
 cat $spec | jq --raw-output .zbackup_info_base64 | base64 -D > info
 popd $tmp

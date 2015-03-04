@@ -10,11 +10,11 @@ repo=$tmp/repo
 
 gdrive_folder_id=$(gdrive folder -t "haven-test $(date)"|grep Id:|cut -d ' ' -f 2)
 
-bin/init $repo $gdrive_folder_id > $tmp/backupspec.json
+haven-b-init $repo $gdrive_folder_id > $tmp/backupspec.json
 
-bin/backup $tmp/backupspec.json test/data firstbackup
-bin/backup $tmp/backupspec.json test/data secondbackup
-bin/restore $tmp/backupspec.json secondbackup $tmp/rest
+haven-b-backup $tmp/backupspec.json test/data firstbackup
+haven-b-backup $tmp/backupspec.json test/data secondbackup
+haven-b-restore $tmp/backupspec.json secondbackup $tmp/rest
 
 expected=$(cd test/data; tar c * | sha1sum)
 actual=$(cd $tmp/rest; tar c * | sha1sum)

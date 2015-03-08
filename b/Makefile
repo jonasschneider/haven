@@ -6,8 +6,25 @@ outsh := $(foreach bin,$(shbins),out/$(bin))
 outvendor := out/haven-b-jq out/haven-b-zbackup out/haven-b-gdrive
 
 executables := $(outgo) $(outsh) $(outvendor)
+version = $(shell cat VERSION)
+
+pkgbase = haven-v$(version)-$(shell eval '$(shell go env); echo $$GOOS')-$(shell eval '$(shell go env); echo $$GOARCH')
+pkgtgz=pkg/$(pkgbase).tar.gz
+pkgtxz=pkg/$(pkgbase).tar.xz
+pkgs=$(pkgtgz) $(pkgtxz)
 
 all: $(executables)
+
+pkg: $(pkgs)
+
+$(pkgtgz): $(executables) pkg
+	tar --transform "s,^out,/$(pkgbase)/," -cxf $@ $^
+
+$(pkgtxz): $(executables) pkg
+	tar --transform "s,^out,/$(pkgbase)/," -cJf $@ $^
+
+pkg:
+	mkdir $@
 
 out/haven-b-jq:
 	cp `which jq` $@

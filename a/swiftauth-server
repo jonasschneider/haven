@@ -1,0 +1,94 @@
+#!/usr/bin/env node
+
+var fs = require('fs'),
+    http = require('http'),
+    https = require('https');
+
+function getToken(cb) {
+  // An object of options to indicate where to post to
+  var post_options = {
+      host: 'api.hubic.com',
+      port: '443',
+      path: '/oauth/token',
+      method: 'POST',
+      headers: {
+          'Content-Type': 'application/x-www-form-urlencoded',
+      }
+  };
+
+  // Set up the request
+  var post_req = https.request(post_options, function(res) {
+      res.setEncoding('utf8');
+      var data = ""
+      res.on('data', function (chunk) {
+          data += chunk;
+      });
+      res.on('end', function() {
+        console.log(data)
+        var tok;
+        try {
+          tok = JSON.parse(data).access_token;
+        } catch(e) {
+          cb({}, e)
+          return
+        }
+
+        var cred_options = {
+          host: 'api.hubic.com',
+          port: '443',
+          path: '/1.0/account/credentials',
+          headers: {
+            'Authorization': 'Bearer '+tok,
+          }
+        }
+
+        https.get(cred_options, function(res2) {
+          var data = "";
+          res2.on('data', function (chunk) {
+            data += chunk;
+          });
+          res2.on('end', function() {
+            cb(JSON.parse(data))
+          })
+        }).on('error', function(e) {
+            console.error(e)
+        })
+      })
+  })
+
+  // post the data. you'll have to customize the XXXs
+  post_req.write("refresh_token=XXX&grant_type=refresh_token&client_id=XXXX&client_secret=XXXX&redirect_uri=https%3A%2F%2Fmcast.net%2F");
+  post_req.end();
+}
+
+getToken(function(data) {
+  console.dir(data)
+});
+var httpListener = function (req, res) {
+  res.sendResponse = function (httpCode, param) {
+    if (httpCode != 204) {
+      console.error('[code!=204][X-Auth-User = ' + req.headers['x-auth-user'] + '] code ' + httpCode + " - " + param);
+    }
+    if (typeof param === 'object') {
+      res.setHeader('X-Storage-Url', param.url);
+      res.setHeader('X-Auth-Token', param.token);
+    }
+    res.writeHead(httpCode);
+    return res.end();
+  };
+
+  getToken(function(data, err) {
+    console.dir(data)
+    if(err) {
+      res.sendResponse(500)
+    } else {
+      res.sendResponse(204,{
+        url: data.endpoint,
+        token: data.token,
+      })
+    }
+  })
+}
+
+var srv = http.createServer(httpListener);
+srv.listen("6666", "127.0.0.1");

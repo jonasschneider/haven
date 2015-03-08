@@ -1,0 +1,35 @@
+#!/bin/bash
+
+set -ux
+
+OPTIONS="--full-if-older-than 3M --allow-source-mismatch --volsize 100 -vnotice"
+
+# Where to backup to
+TARGETBASE=swift://duplicity-qubit
+
+export PASSPHRASE=$(cat /.backupkey)
+
+export SWIFT_USERNAME=a
+export SWIFT_PASSWORD=a
+export SWIFT_AUTHURL=http://localhost:6666
+
+function backup_zfs
+{
+    FS=$1
+    SNAPNAME=$(date "+%Y-%m-%d")
+    REMOTE="$TARGETBASE-${FS//\//--}"
+
+    echo `date --rfc-3339=second` Backup ZFS $FS
+    echo `date --rfc-3339=second` Create snapshot:
+    zfs snapshot ${FS}@$SNAPNAME
+    logfile=$(mktemp /tmp/backuplogXXXX)
+    treepath=/$FS/.zfs/snapshot/$SNAPNAME
+    echo `date --rfc-3339=second` Backup:
+    /usr/bin/duplicity $OPTIONS $treepath $REMOTE 2>&1 | tee $logfile
+    cat $logfile | report "backup $FS"
+    rm $logfile
+
+    echo `date --rfc-3339=second` Done with zfs $FS
+}
+
+backup_zfs tank >>/var/log/haven-backup.log 2>&1

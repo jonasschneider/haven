@@ -1,0 +1,28 @@
+#!/bin/bash
+set -eu
+
+email() {
+  to=$1
+  subject=$2
+  sender_name=$3
+  postmark_token=`cat /etc/postmark-api-token`
+  body_tmpfile=$(mktemp)
+  env SUBJECT="$subject" TO="$to" FROM="$sender_name <mail@jonasschneider.com>" ruby -rjson -e \
+    'puts({ From: ENV["FROM"], To: ENV["TO"], Subject: ENV["SUBJECT"], TextBody: STDIN.read }.to_json)' <&0 > $body_tmpfile
+  status=$(curl --write-out %{http_code} --silent --output /dev/null -g -X POST \
+    "http://api.postmarkapp.com/email" \
+    -H "Accept: application/json" \
+    -H "Content-Type: application/json" \
+    -H "X-Postmark-Server-Token: $postmark_token" \
+    -d @$body_tmpfile)
+  [ "$status" -ne "200" ] && (
+    echo "Error while sending mail." >&2
+    exit 1
+  )
+  exit 0
+}
+
+service=$1
+host=`hostname`
+host_short=`hostname -s`
+email "js.sokrates+reports@gmail.com" "$service report on $host" "$host_short $service reporter"

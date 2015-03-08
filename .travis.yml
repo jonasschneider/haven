@@ -1,0 +1,5 @@
+env:
+  - STRATEGY_UNDER_TEST=a
+  - STRATEGY_UNDER_TEST=b
+
+script: exec $STRATEGY_UNDER_TEST/test/harness

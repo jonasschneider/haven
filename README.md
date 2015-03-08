@@ -1,4 +1,4 @@
-# A safe haven for your data
+# A safe haven for your data [![Build Status](https://travis-ci.org/jonasschneider/haven.svg?branch=master)](https://travis-ci.org/jonasschneider/haven)
 Haven is a set of procedures and tools for backing up a personal storage
 server. It manages redundant offsite backups using independent software and
 remote storage providers. Paranoid integration-test-style restoration drills

@@ -34,7 +34,7 @@ syncpidfile="$repo/tmp/syncpid"
 mkdir -p $(dirname $syncpidfile)
 touch $syncpidfile
 pushd $repo
-EXIT_ON_ABSENT=$syncpidfile haven-b-gdrivesync --archive-and-delete $gdrive_folder &
+GDRIVE_CONFIG_DIR="$repo/gdrive_config" EXIT_ON_ABSENT=$syncpidfile haven-b-gdrivesync --archive-and-delete $gdrive_folder &
 syncpid=$!
 popd
 echo $syncpid > $syncpidfile
@@ -60,5 +60,5 @@ mkdir bundles # could also do it the other way and only create it before running
 
 echo "syncing metadata"
 # finally, archive the metadata
-haven-b-gdrivesync $gdrive_folder
+GDRIVE_CONFIG_DIR="$repo/gdrive_config" haven-b-gdrivesync $gdrive_folder
 popd

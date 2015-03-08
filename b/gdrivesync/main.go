@@ -36,14 +36,16 @@ func visit(path string, f os.FileInfo, err error) error {
   fmt.Printf("Visited: %s\n", path)
 
   q := "'"+parent+"' in parents and title='"+path+"'"
-  out, err := exec.Command("gdrive", "list", "-n", "-q", q).Output()
+  gdriveConfigDir := os.Getenv("GDRIVE_CONFIG_DIR")
+  if gdriveConfigDir == "" { gdriveConfigDir = "~/.gdrive" }
+  out, err := exec.Command("gdrive", "-c", gdriveConfigDir, "list", "-n", "-q", q).Output()
   if err != nil { return err }
   if string(out) == "" {
     log.Println("uploading",path)
-    cmd := exec.Command("gdrive", "upload", "--parent", parent, "--file", path, "--title", path)
+    cmd := exec.Command("gdrive", "-c", gdriveConfigDir, "upload", "--parent", parent, "--file", path, "--title", path)
     err = cmd.Run()
     if err != nil { return err }
-    out, err = exec.Command("gdrive", "list", "-n", "-q", q).Output()
+    out, err = exec.Command("gdrive", "-c", gdriveConfigDir, "list", "-n", "-q", q).Output()
     if err != nil { return err }
     if string(out) == "" {
       log.Fatalln("uploaded file still doesn't exist")
@@ -52,7 +54,7 @@ func visit(path string, f os.FileInfo, err error) error {
 
   id := strings.Fields(string(out))[0]
   log.Println("found",path,"at gdrive id",id)
-  info, err := exec.Command("gdrive", "info", "-i", id).Output()
+  info, err := exec.Command("gdrive", "-c", gdriveConfigDir, "info", "-i", id).Output()
   if err != nil { return err }
   online_md5 := infoMd5Exp.FindStringSubmatch(string(info))[1]
 

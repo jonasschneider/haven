@@ -30,7 +30,7 @@ func main() {
     log.Fatalln("usage: gdrivesync <parent_id>")
   }
 
-  d, err := gdrive.New("", false, false)
+  d, err := gdrive.New(os.Getenv("GDRIVE_CONFIG_DIR"), false, false)
   if err != nil {
     log.Fatalln("An error occurred creating Drive client: %v\n", err)
   }

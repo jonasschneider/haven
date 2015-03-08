@@ -16,10 +16,18 @@ fi
 
 tmp=$(mktemp -d /tmp/haven-restoreXXXXX)
 pushd $tmp
-haven-b-gdriverestore $gdrive_folder
+
+# configure gdrive
+mkdir gdrive_config
+cat $spec | jq --raw-output .gdrive_config_config_base64 | base64 -d > gdrive_config/config.json
+cat $spec | jq --raw-output .gdrive_config_token_base64 | base64 -d > gdrive_config/token.json
+
+# restore data files (non-info)
+GDRIVE_CONFIG_DIR="$tmp/gdrive_config" haven-b-gdriverestore $gdrive_folder
+
 # write out the info file (containing the backup key)
-cat $spec | jq --raw-output .zbackup_info_base64 | base64 -D > info
-popd $tmp
+cat $spec | jq --raw-output .zbackup_info_base64 | base64 -d > info
+popd
 
 if [ -e "$restore_to" ]
 then

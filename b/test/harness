@@ -2,28 +2,7 @@
 
 set -eux
 set -o pipefail
-shopt -s dotglob
 
-tmp=$(mktemp -d /tmp/haven-testXXXXX)
-#repo=/tmp/test
-repo=$tmp/repo
+test/t-dataroundtrip.sh
 
-gdrive_folder_id=$(gdrive folder -t "haven-test $(date)"|grep Id:|cut -d ' ' -f 2)
-
-haven-b-init $repo $gdrive_folder_id > $tmp/backupspec.json
-
-haven-b-backup $tmp/backupspec.json test/data firstbackup
-haven-b-backup $tmp/backupspec.json test/data secondbackup
-haven-b-restore $tmp/backupspec.json secondbackup $tmp/rest
-
-expected=$(cd test/data; tar c * | sha1sum)
-actual=$(cd $tmp/rest; tar c * | sha1sum)
-
-if [ "$expected" != "$actual" ]; then
-  echo expected $expected, but got $actual
-  exit 1
-fi
-
-rm -fr $tmp
-
-echo "all is well!"
+echo "all tests passed!"

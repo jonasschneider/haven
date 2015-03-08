@@ -3,7 +3,21 @@
 set -eux
 
 repo_path=$1
-gdrive_folder_id=$2
+gdrive_folder_name=$2
+
+mkdir $repo_path
+
+# configure gdrive, either from environment or interactively
+if [ -n "${HAVEN_B_GDRIVE_CONFIG_BASE64:-}" ]; then
+  >&2 echo "using config from HAVEN_B_GDRIVE_CONFIG_BASE64"
+  mkdir $repo_path/gdrive_config
+  echo "$HAVEN_B_GDRIVE_CONFIG_BASE64" | base64 -d > $repo_path/gdrive_config/config.json
+  echo "$HAVEN_B_GDRIVE_TOKEN_BASE64" | base64 -d > $repo_path/gdrive_config/token.json
+else
+  stdbuf -i0 -o0 -e0 gdrive -c "$repo_path/gdrive_config" list >&2
+fi
+
+gdrive_folder_id=$(gdrive -c "$repo_path/gdrive_config" folder -t "$gdrive_folder_name"|grep Id:|cut -d ' ' -f 2)
 
 password=$(cat /dev/urandom | LC_CTYPE=c tr -dc A-Za-z0-9 | head -c 100)
 set -o pipefail
@@ -18,6 +32,8 @@ cat <<END
   "local_repo": "$repo_path",
   "zbackup_info_base64": "$(base64 $repo_path/info)",
   "gdrive_folder_id": "$gdrive_folder_id",
-  "zbackup_password": "$password"
+  "zbackup_password": "$password",
+  "gdrive_config_config_base64": "$(cat $repo_path/gdrive_config/config.json | base64)",
+  "gdrive_config_token_base64": "$(cat $repo_path/gdrive_config/token.json | base64)"
 }
 END

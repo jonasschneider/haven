@@ -6,7 +6,7 @@ set -o pipefail
 spec=$1
 name=$2
 restore_to=$3
-gdrive_folder=$(cat $spec | jq --raw-output .gdrive_folder_id)
+gdrive_folder=$(cat $spec | haven-b-jq --raw-output .gdrive_folder_id)
 
 if [ -e "$restore_to" ]
 then
@@ -19,14 +19,14 @@ pushd $tmp
 
 # configure gdrive
 mkdir gdrive_config
-cat $spec | jq --raw-output .gdrive_config_config_base64 | base64 -d > gdrive_config/config.json
-cat $spec | jq --raw-output .gdrive_config_token_base64 | base64 -d > gdrive_config/token.json
+cat $spec | haven-b-jq --raw-output .gdrive_config_config_base64 | base64 -d > gdrive_config/config.json
+cat $spec | haven-b-jq --raw-output .gdrive_config_token_base64 | base64 -d > gdrive_config/token.json
 
 # restore data files (non-info)
 GDRIVE_CONFIG_DIR="$tmp/gdrive_config" haven-b-gdriverestore $gdrive_folder
 
 # write out the info file (containing the backup key)
-cat $spec | jq --raw-output .zbackup_info_base64 | base64 -d > info
+cat $spec | haven-b-jq --raw-output .zbackup_info_base64 | base64 -d > info
 popd
 
 if [ -e "$restore_to" ]
@@ -39,10 +39,10 @@ mkdir $restore_to
 mv $tmp/{archived_bundles,bundles}
 
 pwfile=$(mktemp /tmp/haven-pwXXXXX)
-echo $(cat $spec | jq --raw-output .zbackup_password) > $pwfile
+echo $(cat $spec | haven-b-jq --raw-output .zbackup_password) > $pwfile
 
 pushd $restore_to
-zbackup restore --password-file $pwfile $tmp/backups/$name | tar x
+haven-b-zbackup restore --password-file $pwfile $tmp/backups/$name | tar x
 rm $pwfile
 # fix file ownership: restore to the current user and effective group id
 chown -R `whoami`:`id -Gn|cut -d ' ' -f 1` *

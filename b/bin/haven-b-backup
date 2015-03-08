@@ -8,12 +8,12 @@ spec="$1"
 sourcedir="$2"
 name="$3"
 
-repo=$(cat $spec | jq --raw-output .local_repo)
+repo=$(cat $spec | haven-b-jq --raw-output .local_repo)
 zbackup_file=$repo/backups/$name
-gdrive_folder=$(cat $spec | jq --raw-output .gdrive_folder_id)
+gdrive_folder=$(cat $spec | haven-b-jq --raw-output .gdrive_folder_id)
 
 pwfile=$(mktemp /tmp/haven-pwXXXXX)
-echo $(cat $spec | jq --raw-output .zbackup_password) > $pwfile
+echo $(cat $spec | haven-b-jq --raw-output .zbackup_password) > $pwfile
 
 archive() {
   cd "$sourcedir"
@@ -40,7 +40,7 @@ popd
 echo $syncpid > $syncpidfile
 
 archive | PWFILE="$pwfile" haven-b-zbackup-splitter $((1024 * 100000)) $zbackup_file haven-b-archive-bundles
-archive | zbackup backup --password-file $pwfile $zbackup_file
+archive | haven-b-zbackup backup --password-file $pwfile $zbackup_file
 haven-b-archive-bundles $zbackup_file
 
 rm $pwfile

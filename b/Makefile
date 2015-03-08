@@ -3,9 +3,17 @@ shbins := haven-b-archive-bundles haven-b-backup haven-b-init haven-b-restore
 outgo := $(foreach bin,$(gobins),out/$(bin))
 outsh := $(foreach bin,$(shbins),out/$(bin))
 
-executables := $(outgo) $(outsh)
+outvendor := out/haven-b-jq out/haven-b-zbackup
+
+executables := $(outgo) $(outsh) $(outvendor)
 
 all: $(executables)
+
+out/haven-b-jq:
+	cp `which jq` $@
+
+out/haven-b-zbackup:
+	cp `which zbackup` $@
 
 $(outgo): out/haven-b-%: %/main.go
 	godep go build -o $@ $<

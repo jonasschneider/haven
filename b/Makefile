@@ -8,7 +8,7 @@ executables := $(outgo) $(outsh)
 all: $(executables)
 
 $(outgo): out/haven-b-%: %/main.go
-	go build -o $@ $<
+	godep go build -o $@ $<
 
 $(outsh): out/%: bin/%
 	cp $< $@

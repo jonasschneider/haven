@@ -1,0 +1,51 @@
+{
+	"ImportPath": "github.com/jonasschneider/haven/b",
+	"GoVersion": "go1.4",
+	"Packages": [
+		"./..."
+	],
+	"Deps": [
+		{
+			"ImportPath": "code.google.com/p/goauth2/oauth",
+			"Comment": "weekly-56",
+			"Rev": "afe77d958c701557ec5dc56f6936fcc194d15520"
+		},
+		{
+			"ImportPath": "github.com/boltdb/bolt",
+			"Comment": "v1.0-43-gcf33c9e",
+			"Rev": "cf33c9e0ca0a23509b8bb8edfc63e4776bb1a330"
+		},
+		{
+			"ImportPath": "github.com/prasmussen/gdrive/auth",
+			"Comment": "1.1.0-36-gd3dccc5",
+			"Rev": "d3dccc501b365682fd2542b61e53da56f99e5ae2"
+		},
+		{
+			"ImportPath": "github.com/prasmussen/gdrive/config",
+			"Comment": "1.1.0-36-gd3dccc5",
+			"Rev": "d3dccc501b365682fd2542b61e53da56f99e5ae2"
+		},
+		{
+			"ImportPath": "github.com/prasmussen/gdrive/gdrive",
+			"Comment": "1.1.0-36-gd3dccc5",
+			"Rev": "d3dccc501b365682fd2542b61e53da56f99e5ae2"
+		},
+		{
+			"ImportPath": "github.com/prasmussen/gdrive/util",
+			"Comment": "1.1.0-36-gd3dccc5",
+			"Rev": "d3dccc501b365682fd2542b61e53da56f99e5ae2"
+		},
+		{
+			"ImportPath": "github.com/prasmussen/google-api-go-client/drive/v2",
+			"Rev": "4e530b3dd03d1049ad3179cedf93f6f49024da54"
+		},
+		{
+			"ImportPath": "golang.org/x/net/context",
+			"Rev": "3d87fd621ca9a824c5cff17216ce44769456cb3f"
+		},
+		{
+			"ImportPath": "google.golang.org/api/googleapi",
+			"Rev": "a59c1355aff5abf0f60c182f9fe9b8acb31ac40e"
+		}
+	]
+}

@@ -1,5 +1,8 @@
 env:
-  - STRATEGY_UNDER_TEST=a
   - STRATEGY_UNDER_TEST=b
 
-script: exec $STRATEGY_UNDER_TEST/test/harness
+# decrypt .env file...
+before_install: openssl aes-256-cbc -K $encrypted_0cf3493bd01c_key -iv $encrypted_0cf3493bd01c_iv -in b/.env.enc -out b/.env -d
+
+script: cd $STRATEGY_UNDER_TEST; exec test/harness
+

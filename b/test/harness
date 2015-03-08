@@ -3,6 +3,16 @@
 set -eux
 set -o pipefail
 
+# first, build and install
+make
+sudo make install
+
+# load env variables if present
+if [ -e .env ]: then
+  source .env
+  export $(cut -d= -f1 .env)
+fi
+
 test/t-dataroundtrip.sh
 
 echo "all tests passed!"

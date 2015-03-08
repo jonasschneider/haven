@@ -1,7 +1,20 @@
-install:
-	go build -o /tmp/haven-b-zbackup-splitter zbackup-splitter/*.go
-	go build -o /tmp/haven-b-gdrivesync gdrivesync/*.go
-	go build -o /tmp/haven-b-gdriverestore gdriverestore/*.go
+gobins := haven-b-zbackup-splitter haven-b-gdrivesync haven-b-gdriverestore
+shbins := haven-b-archive-bundles haven-b-backup haven-b-init haven-b-restore
+outgo := $(foreach bin,$(gobins),out/$(bin))
+outsh := $(foreach bin,$(shbins),out/$(bin))
 
-	mv /tmp/haven-b-zbackup-splitter /tmp/haven-b-gdrivesync /tmp/haven-b-gdriverestore /usr/local/bin/
-	cp bin/haven-b-archive-bundles bin/haven-b-backup bin/haven-b-init bin/haven-b-restore /usr/local/bin/
+executables := $(outgo) $(outsh)
+
+all: $(executables)
+
+$(outgo): out/haven-b-%: %/main.go
+	go build -o $@ $<
+
+$(outsh): out/%: bin/%
+	cp $< $@
+
+install: $(executables)
+	cp $^ /usr/local/bin
+
+clean:
+	rm -fr out

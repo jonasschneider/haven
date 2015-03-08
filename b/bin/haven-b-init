@@ -14,10 +14,10 @@ if [ -n "${HAVEN_B_GDRIVE_CONFIG_BASE64:-}" ]; then
   echo "$HAVEN_B_GDRIVE_CONFIG_BASE64" | base64 -d > $repo_path/gdrive_config/config.json
   echo "$HAVEN_B_GDRIVE_TOKEN_BASE64" | base64 -d > $repo_path/gdrive_config/token.json
 else
-  stdbuf -i0 -o0 -e0 gdrive -c "$repo_path/gdrive_config" list >&2
+  stdbuf -i0 -o0 -e0 haven-b-gdrive -c "$repo_path/gdrive_config" list >&2
 fi
 
-gdrive_folder_id=$(gdrive -c "$repo_path/gdrive_config" folder -t "$gdrive_folder_name"|grep Id:|cut -d ' ' -f 2)
+gdrive_folder_id=$(haven-b-gdrive -c "$repo_path/gdrive_config" folder -t "$gdrive_folder_name"|grep Id:|cut -d ' ' -f 2)
 
 password=$(cat /dev/urandom | LC_CTYPE=c tr -dc A-Za-z0-9 | head -c 100)
 set -o pipefail

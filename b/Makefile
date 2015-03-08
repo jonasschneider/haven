@@ -3,7 +3,7 @@ shbins := haven-b-archive-bundles haven-b-backup haven-b-init haven-b-restore
 outgo := $(foreach bin,$(gobins),out/$(bin))
 outsh := $(foreach bin,$(shbins),out/$(bin))
 
-outvendor := out/haven-b-jq out/haven-b-zbackup
+outvendor := out/haven-b-jq out/haven-b-zbackup out/haven-b-gdrive
 
 executables := $(outgo) $(outsh) $(outvendor)
 
@@ -14,6 +14,9 @@ out/haven-b-jq:
 
 out/haven-b-zbackup:
 	cp `which zbackup` $@
+
+out/haven-b-gdrive:
+	godep go build -o $@ github.com/prasmussen/gdrive
 
 $(outgo): out/haven-b-%: %/main.go
 	godep go build -o $@ $<

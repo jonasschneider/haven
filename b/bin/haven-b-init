@@ -29,6 +29,7 @@ rm $pwfile
 
 cat <<END
 {
+  "version": 1,
   "local_repo": "$repo_path",
   "zbackup_info_base64": "$(base64 $repo_path/info)",
   "gdrive_folder_id": "$gdrive_folder_id",

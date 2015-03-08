@@ -8,13 +8,13 @@ Follow the following checklist on a fairly recent Ubuntu-ish Linux box in order 
 - Install `swiftauth-server` to `/root/bin/swiftauth-server`.
 - Ensure `swiftauth-server` is always running. You can do this with an Upstart job like this:
 
-      # cat /etc/init/haven-swiftauth-server.conf
-      description "haven swiftauth server"
+        # cat /etc/init/haven-swiftauth-server.conf
+        description "haven swiftauth server"
 
-      respawn
-      respawn limit 1000 60
+        respawn
+        respawn limit 1000 60
 
-      exec /root/bin/swiftauth-server
+        exec /root/bin/swiftauth-server
 
 - For reporting, sign up for a [Postmark](https://postmarkapp.com/) account. They will give you an API token. Place that into `/etc/postmark-api-token` -- the contents should look like a UUID.
 - Install `report` to `/usr/local/bin/report` and customize the sender and recipient addresses. This is a convenience script for people behind NATs who just want to send a bit of email. `$ echo Test report | report test_service` tests the email setup.
@@ -23,8 +23,8 @@ Follow the following checklist on a fairly recent Ubuntu-ish Linux box in order 
 - If your ZFS dataset name isn't `tank`, change it in the last line of `backup-tank`.
 - Finally, add a cronjob to trigger the backup:
 
-      # cat /etc/cron.weekly/backup
+        # cat /etc/cron.weekly/backup
 
-      #!/bin/bash
-      declare -x PATH="/usr/local/sbin:/usr/local/bin:/usr/sbin:/usr/bin:/sbin:/bin"
-      /root/bin/backup-tank
+        #!/bin/bash
+        declare -x PATH="/usr/local/sbin:/usr/local/bin:/usr/sbin:/usr/bin:/sbin:/bin"
+        /root/bin/backup-tank

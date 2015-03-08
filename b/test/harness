@@ -10,7 +10,7 @@ if [ -n "${CI:-}" ]; then
   export PATH="$PATH:$GOPATH/bin"
 
   # add the zbackup PPA (it's pretty old but Travis runs ubuntu 12.04)
-  sudo add-apt-repository ppa:eugenesan/ppa
+  sudo add-apt-repository -y ppa:eugenesan/ppa
   sudo apt-get update
 
   go get github.com/tools/godep

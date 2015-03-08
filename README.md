@@ -54,11 +54,11 @@ Haven assumes an environment roughly conforming to this description:
 
 ## Strategy overview
 
-| Strategy | Trigger | Deduplicator | Uploader                    | Storage Provider | Storage costs                 | Realtime restore |
+| **Strategy** | Trigger | Deduplicator | Uploader                    | Storage Provider | Storage costs                 | Realtime restore |
 |----------|---------|--------------|-----------------------------|------------------|-------------------------------|------------------|
-| A        | Cron    | Duplicity    | Duplicity (OpenStack Swift) | hubiC            | 0.001€/GB/mo (10TB at 10€/mo) | ✓                |
-| B        | Cron    | ZBackup      | (custom)                    | Google Drive     | 0.01$/GB/mo (1TB at 10$/mo)   | ✓                |
-| C        | Cron    | ZFS          | s3cmd                       | Amazon S3        | 0.01$/GB/mo (flexible)        | very slow        |
+| **A**        | Cron    | Duplicity    | Duplicity (OpenStack Swift) | hubiC            | 0.001€/GB/mo (10TB at 10€/mo) | ✓                |
+| **B**        | Cron    | ZBackup      | (custom)                    | Google Drive     | 0.01$/GB/mo (1TB at 10$/mo)   | ✓                |
+| **C        | Cron    | ZFS          | s3cmd                       | Amazon S3        | 0.01$/GB/mo (flexible)        | very slow        |
 
 ## Backup strategy A (`a/`)
 - Cronjob

@@ -70,7 +70,7 @@ func main() {
         err = os.MkdirAll(filepath.Dir(path), 0700)
         if err != nil { log.Fatalln("mkdir for",path,"returned",err) }
 
-        f, err := os.Create(path+".gdriverestore-tmp")
+        f, err = os.Create(path+".gdriverestore-tmp")
         if err != nil { log.Fatalln(err) }
 
         _, err = io.Copy(f, res.Body)

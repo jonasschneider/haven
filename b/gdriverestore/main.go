@@ -6,7 +6,6 @@ import (
   "log"
   "path/filepath"
   "io"
-  "io/ioutil"
   "encoding/json"
   "strings"
   "os/exec"
@@ -59,20 +58,32 @@ func main() {
       if info.Labels.Trashed { continue }
 
       path := info.Title
-      log.Println("downloading",path)
 
-      // GET the download url
-      res, err := d.Client().Get(info.DownloadUrl)
+      var f *os.File
 
-      f, err := ioutil.TempFile(os.TempDir(), "gdriverestore")
-      if err != nil { log.Fatalln(err) }
+      if _, err = os.Stat(path); os.IsNotExist(err) {
+        log.Println("downloading",path)
 
-      _, err = io.Copy(f, res.Body)
-      if err != nil { log.Fatalln(err) }
-      err = res.Body.Close()
-      if err != nil { log.Fatalln(err) }
-      err = f.Close()
-      if err != nil { log.Fatalln(err) }
+        // GET the download url
+        res, err := d.Client().Get(info.DownloadUrl)
+
+        err = os.MkdirAll(filepath.Dir(path), 0700)
+        if err != nil { log.Fatalln("mkdir for",path,"returned",err) }
+
+        f, err := os.Create(path+".gdriverestore-tmp")
+        if err != nil { log.Fatalln(err) }
+
+        _, err = io.Copy(f, res.Body)
+        if err != nil { log.Fatalln(err) }
+        err = res.Body.Close()
+        if err != nil { log.Fatalln(err) }
+        err = f.Close()
+        if err != nil { log.Fatalln(err) }
+      } else {
+        log.Println("already found",path)
+        f, err = os.Open(path)
+        if err != nil { log.Fatalln(err) }
+      }
 
       if verify {
         out2, err := exec.Command("md5sum", f.Name()).Output()
@@ -98,10 +109,8 @@ func main() {
         if err != nil { log.Fatalln(err) }
       }
 
-      err = os.MkdirAll(filepath.Dir(path), 0700)
-      if err != nil { log.Fatalln("mkdir for",path,"returned",err) }
-
       // everything is well, move file into place
+      // this will be a no-op if the file already existed
       err = os.Rename(f.Name(), path)
       if err != nil { log.Fatalln("mkdir for",path,"returned",err) }
     }

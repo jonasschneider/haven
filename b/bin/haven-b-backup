@@ -53,7 +53,7 @@ anywait $syncpid
 
 pushd $repo
 # these are here mainly to assert that the dirs are empty
-ls archived_bundles | xargs -I {} rmdir archived_bundles/{}
+ls archived_bundles | xargs -n 1 -I {} rmdir archived_bundles/{}
 rmdir bundles
 rmdir tmp
 mkdir bundles # could also do it the other way and only create it before running backup

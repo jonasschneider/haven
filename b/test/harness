@@ -27,6 +27,7 @@ if [ -e .env ]; then
   export $(cut -d= -f1 .env)
 fi
 
-test/t-dataroundtrip.sh
+. test/t-dataroundtrip.sh
+. test/t-resumerestore.sh
 
 echo "all tests passed!"

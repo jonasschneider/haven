@@ -6,19 +6,16 @@ tmp=$(mktemp -d /tmp/haven-testXXXXX)
 repo=$tmp/repo
 data=$tmp/data
 mkdir $data
-dd if=/dev/urandom of=$data/x bs=512 count=8
+dd if=/dev/urandom of=$data/x bs=512 count=20
 
-gdrive_folder_name="haven-test $(date)"
-haven-b-init $repo $gdrive_folder_name > $tmp/backupspec.json
-
+haven-b-init $repo "haven-test $(date)" > $tmp/backupspec.json
 haven-b-backup $tmp/backupspec.json $data firstbackup
-haven-b-backup $tmp/backupspec.json $data secondbackup
 
-# now, a crash happens
-rm -fr $tmp/repo
+# try a resume that crashes during sync
+! HAVEN_B_CRASHAT=onerestore haven-b-restore $tmp/backupspec.json firstbackup $tmp/restored
 
-# now attempt to restore
-haven-b-restore $tmp/backupspec.json secondbackup $tmp/restored
+# resume
+haven-b-restore $tmp/backupspec.json firstbackup $tmp/restored
 
 expected=$(cd $data; tar c * | sha1sum)
 actual=$(cd $tmp/restored; tar c * | sha1sum)

@@ -113,6 +113,8 @@ func main() {
       // this will be a no-op if the file already existed
       err = os.Rename(f.Name(), path)
       if err != nil { log.Fatalln("mkdir for",path,"returned",err) }
+
+      if os.Getenv("HAVEN_B_CRASHAT") == "onerestore" { crash() }
     }
 
     nextPageToken = list.NextPageToken
@@ -120,4 +122,10 @@ func main() {
       break
     }
   }
+}
+
+func crash() {
+  self, err := os.FindProcess(os.Getpid())
+  if err != nil { log.Fatalln(err) }
+  self.Signal(os.Kill)
 }

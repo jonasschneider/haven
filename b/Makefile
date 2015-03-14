@@ -35,7 +35,7 @@ out/haven-b-zbackup:
 out/haven-b-gdrive:
 	godep go build -o $@ github.com/prasmussen/gdrive
 
-$(outgo): out/haven-b-%: %/main.go
+$(outgo): out/haven-b-%: $(wildcard %/*.go)
 	godep go build -o $@ $<
 
 $(outsh): out/%: bin/%

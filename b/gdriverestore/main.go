@@ -6,19 +6,9 @@ import (
   "log"
   "path/filepath"
   "io"
-  "encoding/json"
-  "strings"
-  "os/exec"
 
   "github.com/prasmussen/gdrive/gdrive"
-  "github.com/boltdb/bolt"
 )
-
-type FileManifest struct {
-  Path string
-  GdriveId string
-  Md5 string
-}
 
 func main() {
   verifyptr := flag.Bool("verify", false, "Use gdrivesync-state.boltdb to verify downloaded files")
@@ -29,21 +19,22 @@ func main() {
     log.Fatalln("usage: gdrivesync <parent_id>")
   }
 
-  d, err := gdrive.New(os.Getenv("GDRIVE_CONFIG_DIR"), false, false)
-  if err != nil {
-    log.Fatalln("An error occurred creating Drive client: %v\n", err)
-  }
-
-  var db *bolt.DB
   if verify {
-    db, err = bolt.Open("gdrivesync-state.boltdb", 0600, nil)
-    if err != nil { log.Fatalln(err) }
+    err := runFromManifest()
+    if err != nil {
+      log.Fatalln(err)
+    } else {
+      return
+    }
   }
-
 
   var nextPageToken string
 
   for {
+    d, err := gdrive.New(os.Getenv("GDRIVE_CONFIG_DIR"), false, false)
+    if err != nil {
+      log.Fatalln("An error occurred creating Drive client: %v\n", err)
+    }
     caller := d.Children.List(parentId)
     if nextPageToken != "" {
       caller.PageToken(nextPageToken)
@@ -52,6 +43,10 @@ func main() {
     if err != nil { log.Fatalln(err) }
 
     for _, child := range list.Items {
+      d, err := gdrive.New(os.Getenv("GDRIVE_CONFIG_DIR"), false, false)
+      if err != nil {
+        log.Fatalln("An error occurred creating Drive client: %v\n", err)
+      }
       info, err := d.Files.Get(child.Id).Do()
       if err != nil { log.Fatalln(err) }
       if info.DownloadUrl == "" { continue }
@@ -82,30 +77,6 @@ func main() {
       } else {
         log.Println("already found",path)
         f, err = os.Open(path)
-        if err != nil { log.Fatalln(err) }
-      }
-
-      if verify {
-        out2, err := exec.Command("md5sum", f.Name()).Output()
-        if err != nil { log.Fatalln(err) }
-        actual_md5 := strings.Fields(string(out2))[0]
-
-        err = db.View(func(tx *bolt.Tx) error {
-            v := tx.Bucket([]byte("GdriveManifestsByPath")).Get([]byte(path))
-            var manifest FileManifest
-            err := json.Unmarshal(v, &manifest)
-            if err != nil { return err }
-
-            if manifest.GdriveId != child.Id {
-              log.Fatalln("ID mismatch for",path,"-- expected",manifest.GdriveId,"but got",child.Id)
-            }
-
-            if manifest.Md5 != actual_md5 {
-              log.Fatalln("Md5 mismatch for",path,"-- expected",manifest.Md5,"but got",actual_md5)
-            }
-
-            return nil
-        })
         if err != nil { log.Fatalln(err) }
       }
 

@@ -24,36 +24,36 @@ func ensureFile(manifest FileManifest) error {
 
   var f *os.File
 
-  if _, err := os.Stat(path); os.IsNotExist(err) {
-    log.Println("downloading",path)
-    d, err := gdrive.New(os.Getenv("GDRIVE_CONFIG_DIR"), false, false)
-    if err != nil {
-      log.Fatalln("An error occurred creating Drive client: %v\n", err)
-    }
-
-    info, err := d.Files.Get(manifest.GdriveId).Do()
-    if err != nil { log.Fatalln(err) }
-
-    // GET the download url
-    res, err := d.Client().Get(info.DownloadUrl)
-
-    err = os.MkdirAll(filepath.Dir(path), 0700)
-    if err != nil { log.Fatalln("mkdir for",path,"returned",err) }
-
-    f, err = os.Create(path+".gdriverestore-tmp")
-    if err != nil { log.Fatalln(err) }
-
-    _, err = io.Copy(f, res.Body)
-    if err != nil { log.Fatalln(err) }
-    err = res.Body.Close()
-    if err != nil { log.Fatalln(err) }
-    err = f.Close()
-    if err != nil { log.Fatalln(err) }
-  } else {
+  if _, err := os.Stat(path); err == nil {
     log.Println("already found",path)
-    f, err = os.Open(path)
-    if err != nil { return err }
+    return nil
   }
+
+  log.Println("downloading",path)
+
+  d, err := gdrive.New(os.Getenv("GDRIVE_CONFIG_DIR"), false, false)
+  if err != nil {
+    log.Fatalln("An error occurred creating Drive client: %v\n", err)
+  }
+
+  info, err := d.Files.Get(manifest.GdriveId).Do()
+  if err != nil { log.Fatalln(err) }
+
+  // GET the download url
+  res, err := d.Client().Get(info.DownloadUrl)
+
+  err = os.MkdirAll(filepath.Dir(path), 0700)
+  if err != nil { log.Fatalln("mkdir for",path,"returned",err) }
+
+  f, err = os.Create(path+".gdriverestore-tmp")
+  if err != nil { log.Fatalln(err) }
+
+  _, err = io.Copy(f, res.Body)
+  if err != nil { log.Fatalln(err) }
+  err = res.Body.Close()
+  if err != nil { log.Fatalln(err) }
+  err = f.Close()
+  if err != nil { log.Fatalln(err) }
 
   md5_out, err := exec.Command("md5sum", f.Name()).Output()
   if err != nil { log.Fatalln(err) }

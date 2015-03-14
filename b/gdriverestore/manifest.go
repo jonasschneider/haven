@@ -45,8 +45,16 @@ func ensureFile(manifest FileManifest) error {
   err = os.MkdirAll(filepath.Dir(path), 0700)
   if err != nil { log.Fatalln("mkdir for",path,"returned",err) }
 
-  f, err = os.Create(path+".gdriverestore-tmp")
+  tmpPath := path+".gdriverestore-tmp"
+  f, err = os.Create(tmpPath)
+  if os.IsExist(err) {
+    // remove if the tmpfile already exists
+    err = os.Remove(tmpPath)
+    if err != nil { log.Fatalln(err) }
+    f, err = os.Create(tmpPath)
+  }
   if err != nil { log.Fatalln(err) }
+
 
   _, err = io.Copy(f, res.Body)
   if err != nil { log.Fatalln(err) }

@@ -37,6 +37,9 @@ out/haven-b-gdrive:
 
 .SECONDEXPANSION:
 $(outgo): out/haven-b-%: $$(notdir $$*)/*.go
+	rm -fr ~/go/src/github.com/jonasschneider/haven/b
+	mkdir -p ~/go/src/github.com/jonasschneider/haven
+	cp -r . ~/go/src/github.com/jonasschneider/haven/b
 	godep go build -o $@ $*/*.go
 
 $(outsh): out/%: bin/%
@@ -47,3 +50,13 @@ install: $(executables)
 
 clean:
 	rm -fr out
+
+savedeps:
+	rm -fr ~/go/src/github.com/jonasschneider/haven/b
+	mkdir -p ~/go/src/github.com/jonasschneider/haven
+	cp -r /vagrant ~/go/src/github.com/jonasschneider/haven/b
+
+	cd ~/go/src/github.com/jonasschneider/haven/b && git init && godep save github.com/jonasschneider/haven/b/... github.com/prasmussen/gdrive
+	mv /vagrant/Godeps /vagrant/Godeps_old || true
+	mv ~/go/src/github.com/jonasschneider/haven/b/Godeps /vagrant
+	rm -fr /vagrant/Godeps_old

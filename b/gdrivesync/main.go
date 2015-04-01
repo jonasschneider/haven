@@ -39,46 +39,59 @@ func visit(path string, f os.FileInfo, err error) error {
   q := "'"+parent+"' in parents and title='"+path+"'"
   gdriveConfigDir := os.Getenv("GDRIVE_CONFIG_DIR")
   if gdriveConfigDir == "" { gdriveConfigDir = "~/.gdrive" }
-  out, err := exec.Command("haven-b-gdrive", "-c", gdriveConfigDir, "list", "-n", "-q", q).Output()
-  if err != nil { return err }
-  if string(out) == "" {
+
+  var manifest FileManifest
+
+  err = db.View(func(tx *bolt.Tx) error {
+    b := tx.Bucket([]byte("GdriveManifestsByPath"))
+    if b == nil { return fmt.Errorf("didn't find bucket") }
+
+    if v := b.Get([]byte(path)); v != nil {
+      err := json.Unmarshal(v, &manifest)
+      if err != nil { return err }
+    }
+
+    return nil
+  })
+
+  if err != nil {
     log.Println("uploading",path)
     cmd := exec.Command("haven-b-gdrive", "-c", gdriveConfigDir, "upload", "--parent", parent, "--file", path, "--title", path)
     err = cmd.Run()
     if err != nil { return err }
-    out, err = exec.Command("haven-b-gdrive", "-c", gdriveConfigDir, "list", "-n", "-q", q).Output()
+    out, err := exec.Command("haven-b-gdrive", "-c", gdriveConfigDir, "list", "-n", "-q", q).Output()
     if err != nil { return err }
     if string(out) == "" {
       log.Fatalln("uploaded file still doesn't exist")
     }
-  }
 
-  id := strings.Fields(string(out))[0]
-  log.Println("found",path,"at gdrive id",id)
-  info, err := exec.Command("haven-b-gdrive", "-c", gdriveConfigDir, "info", "-i", id).Output()
-  if err != nil { return err }
-  online_md5 := infoMd5Exp.FindStringSubmatch(string(info))[1]
-
-  out2, err := exec.Command("md5sum", path).Output()
-  if err != nil { return err }
-  actual_md5 := strings.Fields(string(out2))[0]
-
-  if online_md5 != actual_md5 {
-    log.Println("found md5",online_md5,"while actual_md5 is",actual_md5)
-    log.Fatalln("md5 mismatch")
-  }
-
-  // add it to our manifest
-  err = db.Update(func(tx *bolt.Tx) error {
-    m := FileManifest{Path: path, GdriveId: id, Md5: actual_md5}
-    b := tx.Bucket([]byte("GdriveManifestsByPath"))
-
-    x, err := json.Marshal(m)
+    id := strings.Fields(string(out))[0]
+    log.Println("found",path,"at gdrive id",id)
+    info, err := exec.Command("haven-b-gdrive", "-c", gdriveConfigDir, "info", "-i", id).Output()
     if err != nil { return err }
-    err = b.Put([]byte(path), x)
-    return err
-  })
-  if err != nil { log.Fatalln(err) }
+    online_md5 := infoMd5Exp.FindStringSubmatch(string(info))[1]
+
+    out2, err := exec.Command("md5sum", path).Output()
+    if err != nil { return err }
+    actual_md5 := strings.Fields(string(out2))[0]
+
+    if online_md5 != actual_md5 {
+      log.Println("found md5",online_md5,"while actual_md5 is",actual_md5)
+      log.Fatalln("md5 mismatch")
+    }
+
+    // add it to our manifest
+    err = db.Update(func(tx *bolt.Tx) error {
+      m := FileManifest{Path: path, GdriveId: id, Md5: actual_md5}
+      b := tx.Bucket([]byte("GdriveManifestsByPath"))
+
+      x, err := json.Marshal(m)
+      if err != nil { return err }
+      err = b.Put([]byte(path), x)
+      return err
+    })
+    if err != nil { log.Fatalln(err) }
+  }
 
   if *archiving {
     log.Println("removing local copy of",path,"after successful upload")

@@ -5,6 +5,7 @@ import (
   "golang.org/x/oauth2/google"
   "github.com/cenkalti/backoff"
   "github.com/pivotal-golang/bytefmt"
+  "github.com/docopt/docopt-go"
 
   "time"
   "encoding/json"
@@ -26,21 +27,43 @@ import (
 const PreferredChunkSize = 1024 * 1024 * 1
 
 func main() {
-  zero, _ := os.Open("/dev/urandom")
-  id := upload(&io.LimitedReader{N: 1024*1024*2, R: zero}, "zerotest")
-  // output just the ID
+      usage := `Upload a large stream from stdin to Google Drive.
+
+Usage:
+  haven-b-upload <human_filename> <parent_folder_id>
+
+Options:
+  -h --help     Show this screen.
+  --version     Show version.`
+
+  arguments, err := docopt.Parse(usage, nil, true, "0.1", false)
+  name := arguments["<human_filename>"].(string)
+  folder_id := arguments["<parent_folder_id>"].(string)
+  if name == "" || folder_id == "" {
+    log.Fatalln("invalid arguments")
+  }
+  if err != nil { log.Fatalln(err) }
+
+  stat, _ := os.Stdin.Stat()
+  if (stat.Mode() & os.ModeCharDevice) != 0 {
+    log.Fatalln("Refusing to read from terminal")
+  }
+
+  id := upload(os.Stdin, name, folder_id)
   fmt.Printf("%s\n", id)
 }
 
 /// Returns the Google Drive ID of the created file on success, panics on error.
-func upload(in_raw io.Reader, filename string) string {
+/// `filename` may not contain JSON escape sequences (" and \).
+func upload(in_raw io.Reader, filename, folder_id string) string {
   counter := io.LimitedReader{N: math.MaxInt64, R: in_raw}
   hash := md5.New()
   in := io.TeeReader(&counter, hash)
   client, err := getAuthenticatedClient()
   if err != nil { log.Fatalln(err)}
 
-  var metadataJson = []byte(`{"title":"Buy cheese and bread for breakfast."}`)
+  // I really want to do this properly, but parents is an array and I hate that.
+  var metadataJson = []byte(fmt.Sprintf(`{"title":"%s", "parents":["%s"]}`, filename, folder_id))
 
   // Don't bother with retrying this first request; if the network is down, we can safely fail
   // and we probably have failed at the OAuth stage already.
@@ -145,12 +168,10 @@ func upload(in_raw io.Reader, filename string) string {
     log.Fatalln("whoops -- uploaded",total_size,"bytes, but read",read)
   }
   var tmpbuf bytes.Buffer
-  n, err := counter.Read(tmpbuf.Bytes())
+  tmpbuf.Grow(10)
+  n, _ := in_raw.Read(tmpbuf.Bytes())
   if n != 0 {
     log.Fatalln("didn't drain input buffer -- read",n,"instead of 0")
-  }
-  if err != io.EOF {
-    log.Fatalln("didn't drain input buffer --",err,"is not EOF")
   }
 
 

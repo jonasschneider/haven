@@ -1,11 +1,9 @@
-gobins := haven-b-zbackup-splitter haven-b-gdrivesync haven-b-gdriverestore
-shbins := haven-b-archive-bundles haven-b-backup haven-b-init haven-b-restore
+gobins := haven-b-upload
+shbins :=
 outgo := $(foreach bin,$(gobins),out/$(bin))
 outsh := $(foreach bin,$(shbins),out/$(bin))
 
-outvendor := out/haven-b-jq out/haven-b-zbackup out/haven-b-gdrive
-
-executables := $(outgo) $(outsh) $(outvendor)
+executables := $(outgo) $(outsh)
 version = $(shell cat VERSION)
 
 pkgbase = haven-v$(version)-$(shell eval '$(shell go env); echo $$GOOS')-$(shell eval '$(shell go env); echo $$GOARCH')
@@ -26,20 +24,11 @@ $(pkgtxz): $(executables) pkg
 pkg:
 	mkdir $@
 
-out/haven-b-jq:
-	cp `which jq` $@
-
-out/haven-b-zbackup:
-	cp `which zbackup` $@
-
-out/haven-b-gdrive:
-	godep go build -o $@ github.com/prasmussen/gdrive
-
 .SECONDEXPANSION:
-$(outgo): out/haven-b-%: $$(notdir $$*)/*.go
-	rm -fr ~/go/src/github.com/jonasschneider/haven/b
-	mkdir -p ~/go/src/github.com/jonasschneider/haven
-	cp -r . ~/go/src/github.com/jonasschneider/haven/b
+$(outgo): out/%: $$(notdir $$*)/*.go
+	rm -fr /vagrant/_go/src/github.com/jonasschneider/haven/b
+	mkdir -p /vagrant/_go/src/github.com/jonasschneider/haven/b
+	cp -r $^ Godeps /vagrant/_go/src/github.com/jonasschneider/haven/b
 	godep go build -o $@ $*/*.go
 
 $(outsh): out/%: bin/%
@@ -52,11 +41,12 @@ clean:
 	rm -fr out
 
 savedeps:
-	rm -fr ~/go/src/github.com/jonasschneider/haven/b
-	mkdir -p ~/go/src/github.com/jonasschneider/haven
-	cp -r /vagrant ~/go/src/github.com/jonasschneider/haven/b
+	rm -fr /vagrant/_go/src/github.com/jonasschneider/haven/b
+	mkdir -p /vagrant/_go/src/github.com/jonasschneider/haven/b
+	bash -c "cp -r /vagrant/haven-* /vagrant/_go/src/github.com/jonasschneider/haven/b"
+	cp -r /vagrant/Godeps /vagrant/_go/src/github.com/jonasschneider/haven/b || true
 
-	cd ~/go/src/github.com/jonasschneider/haven/b && git init && godep save github.com/jonasschneider/haven/b/... github.com/prasmussen/gdrive
+	cd /vagrant/_go/src/github.com/jonasschneider/haven/b && git init && godep save github.com/jonasschneider/haven/b/...
 	mv /vagrant/Godeps /vagrant/Godeps_old || true
-	mv ~/go/src/github.com/jonasschneider/haven/b/Godeps /vagrant
+	mv /vagrant/_go/src/github.com/jonasschneider/haven/b/Godeps /vagrant
 	rm -fr /vagrant/Godeps_old

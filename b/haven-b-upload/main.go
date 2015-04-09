@@ -46,6 +46,10 @@ Options:
 		log.Fatalln(err)
 	}
 
+	// Try to get a client here. This will start the OAuth2 flow.
+	// Do this before doing the terminal check so that we *can* use a terminal for this.
+	getAuthenticatedClient()
+
 	stat, _ := os.Stdin.Stat()
 	if (stat.Mode() & os.ModeCharDevice) != 0 {
 		log.Fatalln("Refusing to read from terminal")

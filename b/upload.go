@@ -7,6 +7,9 @@ import (
   "net/http"
   "io/ioutil"
   "bytes"
+  "crypto/md5"
+  "encoding/hex"
+  "math"
 
   "log"
   "fmt"
@@ -17,10 +20,13 @@ import (
 
 func main() {
   zero, _ := os.Open("/dev/zero")
-  upload(&io.LimitedReader{N: 1024*1024*3, R: zero}, "zerotest")
+  upload(&io.LimitedReader{N: 1024*1024*2, R: zero}, "zerotest")
 }
 
-func upload(in io.Reader, filename string) {
+func upload(in_raw io.Reader, filename string) {
+  counter := io.LimitedReader{N: math.MaxInt64, R: in_raw}
+  hash := md5.New()
+  in := io.TeeReader(&counter, hash)
   client, err := getAuthenticatedClient()
   if err != nil { log.Fatalln(err)}
 
@@ -35,34 +41,41 @@ func upload(in io.Reader, filename string) {
   log.Println("upload is", uploadUrl)
 
   // use 16M chunk size .. ?
-  const ChunkSize = 1024 * 1024 // * 16
+  const PreferredChunkSize = 1024 * 1024 // * 16
 
   var chunk bytes.Buffer
-  chunk.Grow(ChunkSize)
-  total_size := 0
+  var slop bytes.Buffer
+  chunk.Grow(PreferredChunkSize)
 
-  chunkoffs := 0
+  // A word on sizes: the total sizes are int64 for .. you know, scalability.
+  // However, buffer and chunk sizes are ints, as that's what golang uses for
+  // memory management. Think twice if you feel like you have to cast
+  // int64->int somewhere.
+  var total_size int64
+
+  var chunkoffs int64
   for {
     chunk.Reset()
-    chunksize_64, err := io.Copy(&chunk, &io.LimitedReader{N: ChunkSize, R: in})
+    chunksize, err := io.Copy(&chunk, &io.LimitedReader{N: PreferredChunkSize, R: in})
     if err != nil { log.Fatalln(err) }
-    chunksize := int(chunksize_64) // sigh..
     total_size += chunksize
-    if chunksize == 0 {
-      log.Println("EOF!")
+    if chunksize != PreferredChunkSize {
+      // Short read; that means we've reached EOF (since err is nil).
+      // The routine after this loop will take care of sending this short-sized chunk.
+      slop = chunk
       break
     }
 
     done_in_chunk := 0
-    nextoffs := chunkoffs + done_in_chunk
+    nextoffs := chunkoffs + int64(done_in_chunk)
     req, err := http.NewRequest("PUT", uploadUrl, bytes.NewReader(chunk.Bytes()[done_in_chunk:]))
-    req.Header.Set("Content-Range", fmt.Sprintf("bytes %d-%d/*", nextoffs, chunkoffs+len(chunk.Bytes())-1))
+    req.Header.Set("Content-Range", fmt.Sprintf("bytes %d-%d/*", nextoffs, chunkoffs+int64(len(chunk.Bytes())-1)))
     resp, err := client.Do(req)
     log.Println(resp, err)
     if err != nil { log.Fatalln(err)}
     if resp.StatusCode != 308 { log.Fatalln("failed to upload chunk") }
-    reported_start := 0
-    reported_end := 0
+    var reported_start int64
+    var reported_end int64
     n, err := fmt.Sscanf(resp.Header.Get("Range"), "bytes=%d-%d", &reported_start, &reported_end)
     if err != nil || n != 2 {
       log.Fatalln("failed to parse Range header",resp.Header.Get("Range"))
@@ -70,47 +83,76 @@ func upload(in io.Reader, filename string) {
     if reported_start != 0 {
       log.Fatalln("insane reported_start, expected",0,"got",reported_start)
     }
-    if reported_end != chunkoffs+chunksize-1 {
+    if reported_end != chunkoffs+int64(chunksize-1) {
       // let's not deal with partially uploaded chunks for now
       log.Fatalln("insane reported_end, expected",chunkoffs+chunksize-1,"got",reported_end)
     }
 
-    log.Println("uploaded da chunk")
+    log.Println("uploaded chunk from",chunkoffs,"to",chunkoffs+chunksize)
     chunkoffs += chunksize
   }
 
   log.Println("reached EOF, finishing..")
 
-  // sanity check: validate that we have everything by querying the current range one last time
-  req, err := http.NewRequest("PUT", uploadUrl, nil)
-  req.Header.Set("Content-Range", "bytes */*")
+  // There might be some leftovers from the next-to-last chunk that we have to
+  // flush now, they are stored in `slop`.
+  // Now send the final chunk including the total size. Google will complain if we
+  // screwed up the ranges somewhere in between.
+  req, err := http.NewRequest("PUT", uploadUrl, &slop)
+  var bytes_here string
+  if slop.Len() == 0 {
+    bytes_here = "*"
+  } else {
+    bytes_here = fmt.Sprintf("%d-%d",total_size-int64(slop.Len()),total_size-1)
+  }
+  req.Header.Set("Content-Range", fmt.Sprintf("bytes %s/%d", bytes_here, total_size))
+  log.Println(req)
   resp, err := client.Do(req)
-  if resp.StatusCode != 308 { log.Fatalln("failed to validate final upload") }
-  reported_start := 0
-  reported_end := 0
-  n, err := fmt.Sscanf(resp.Header.Get("Range"), "bytes=%d-%d", &reported_start, &reported_end)
-  if err != nil || n != 2 {
-    log.Fatalln("failed to parse Range header",resp.Header.Get("Range"))
+  log.Println(resp, err)
+  if err != nil { log.Fatalln(err)}
+  if resp.StatusCode != 200 {
+    x, err := ioutil.ReadAll(resp.Body)
+    if err != nil { log.Fatalln(err)}
+    log.Fatalln("failed to finalize upload", string(x))
   }
-  if reported_start != 0 {
-    log.Fatalln("insane reported_start, expected",0,"got",reported_start)
+  outputMetadataJson, err := ioutil.ReadAll(resp.Body)
+  if err != nil { log.Fatalln(err)}
+  var meta GdriveFileMeta
+  err = json.Unmarshal(outputMetadataJson, &meta)
+  if err != nil { log.Fatalln(err)}
+  log.Println("Google has all",total_size,"bytes")
+
+
+  // Sanity check 1:
+  // Make sure we have actually drained the input.
+  read := math.MaxInt64 - counter.N
+  if read != total_size {
+    log.Fatalln("whoops -- uploaded",total_size,"bytes, but read",read)
   }
-  // check that the entire file was uploaded
-  // TODO: what about empty files?
-  if reported_end != total_size-1 {
-    log.Fatalln("insane reported_end, expected",total_size-1,"got",reported_end)
+  var tmpbuf bytes.Buffer
+  n, err := counter.Read(tmpbuf.Bytes())
+  if n != 0 {
+    log.Fatalln("didn't drain input buffer -- read",n,"instead of 0")
+  }
+  if err != io.EOF {
+    log.Fatalln("didn't drain input buffer --",err,"is not EOF")
   }
 
-  // now actually finish the upload
-  req, err = http.NewRequest("PUT", uploadUrl, nil)
-  req.Header.Set("Content-Length", "0")
-  req.Header.Set("Content-Range", fmt.Sprintf("bytes */%d", total_size))
-  resp, err = client.Do(req)
-  if err != nil { log.Fatalln(err)}
-  if resp.StatusCode != 200 { log.Fatalln("failed to finalize upload") }
-  outputMetadataJson, err := ioutil.ReadAll(resp.Body)
-  log.Println(string(outputMetadataJson))
-  log.Println("yep, google has all",total_size,"bytes")
+
+  // Sanity check 2:
+  // Check the md5sum of the gdrive file against what Google tells us
+  expected_md5 := hex.EncodeToString(hash.Sum(nil))
+  actual_md5 := meta.Md5
+
+  if expected_md5 != actual_md5 {
+    log.Fatalln("final md5 check failed: expected",expected_md5,"but Google has",actual_md5)
+  } else {
+    log.Println("hash check passed --",expected_md5)
+  }
+}
+
+type GdriveFileMeta struct {
+  Md5 string `json:"md5Checksum"`
 }
 
 

@@ -24,7 +24,7 @@ import (
 )
 
 // use 16M chunk size .. ?
-const PreferredChunkSize = 1024 * 1024 * 1
+const PreferredChunkSize = 1024 * 1024 * 16
 
 func main() {
 	usage := `Upload a large stream from stdin to Google Drive.

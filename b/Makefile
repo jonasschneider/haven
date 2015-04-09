@@ -26,9 +26,6 @@ pkg:
 
 .SECONDEXPANSION:
 $(outgo): out/%: $$(notdir $$*)/*.go
-	rm -fr /vagrant/_go/src/github.com/jonasschneider/haven/b
-	mkdir -p /vagrant/_go/src/github.com/jonasschneider/haven/b
-	cp -r $^ Godeps /vagrant/_go/src/github.com/jonasschneider/haven/b
 	godep go build -o $@ $*/*.go
 
 $(outsh): out/%: bin/%

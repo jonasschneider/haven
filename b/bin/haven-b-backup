@@ -4,61 +4,8 @@ set -eux
 set -o pipefail
 shopt -s dotglob
 
-spec="$1"
-sourcedir="$2"
-name="$3"
+snapshot=$1
+filename=$(date "+%Y-%m-%d-%H-%M")-$2.zfs.xz.gpg
+gdrive_folder="0B7l3QydqgCmffjQ5aFBqT3BIOVhPNVdNWUwzZUpNbERRUFF6b3NUUVFzTTlOaEJfVUkzZEE"
 
-repo=$(cat $spec | haven-b-jq --raw-output .local_repo)
-zbackup_file=$repo/backups/$name
-gdrive_folder=$(cat $spec | haven-b-jq --raw-output .gdrive_folder_id)
-
-pwfile=$(mktemp /tmp/haven-pwXXXXX)
-echo $(cat $spec | haven-b-jq --raw-output .zbackup_password) > $pwfile
-
-archive() {
-  cd "$sourcedir"
-  tar c *
-}
-
-# wait() for a specific PID
-anywait() {
-  set +ex
-  while kill -0 "$1" 2>/dev/null; do
-      sleep 0.5
-  done
-  set -ex
-}
-
-# Start syncing in the background
-syncpidfile="$repo/tmp/syncpid"
-mkdir -p $(dirname $syncpidfile)
-touch $syncpidfile
-pushd $repo
-GDRIVE_CONFIG_DIR="$repo/gdrive_config" EXIT_ON_ABSENT=$syncpidfile haven-b-gdrivesync --archive-and-delete $gdrive_folder &
-syncpid=$!
-popd
-echo $syncpid > $syncpidfile
-
-archive | PWFILE="$pwfile" haven-b-zbackup-splitter $((1024 * 100000)) $zbackup_file haven-b-archive-bundles
-archive | haven-b-zbackup backup --password-file $pwfile $zbackup_file
-haven-b-archive-bundles $zbackup_file
-
-rm $pwfile
-
-echo "Backup done, waiting for Google Drive sync to finish"
-
-# wait for the sync to finish
-rm $syncpidfile # this triggers the exit
-anywait $syncpid
-
-pushd $repo
-# these are here mainly to assert that the dirs are empty
-ls archived_bundles | xargs -n 1 -I {} rmdir archived_bundles/{}
-rmdir bundles
-rmdir tmp
-mkdir bundles # could also do it the other way and only create it before running backup
-
-echo "syncing metadata"
-# finally, archive the metadata
-GDRIVE_CONFIG_DIR="$repo/gdrive_config" haven-b-gdrivesync $gdrive_folder
-popd
+zfs send $snapshot | xz | haven-b-upload $filename $gdrive_folder

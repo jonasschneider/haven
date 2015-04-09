@@ -8,17 +8,6 @@ name=$2
 restore_to=$3
 gdrive_folder=$(cat $spec | haven-b-jq --raw-output .gdrive_folder_id)
 
-if [ -e "$restore_to" ]
-then
-  echo "$restore_to already exists!"
-  prev=$(ls $(dirname $restore_to)|grep $(basename $restore_to)|grep haventmp|head -1)
-  tmp=$(dirname $restore_to)/$prev
-  echo "Resuming with tmp=$tmp"
-else
-  mkdir $restore_to
-  tmp=$(mktemp -d ${restore_to}-haventmpXXXXX)
-fi
-
 pushd $tmp
 
 if [ -e gdrive_config ]; then

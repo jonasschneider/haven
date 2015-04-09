@@ -2,26 +2,29 @@ set -eux
 set -o pipefail
 shopt -s dotglob
 
-tmp=$(mktemp -d /tmp/haven-testXXXXX)
-repo=$tmp/repo
-data=$tmp/data
-mkdir $data
-dd if=/dev/urandom of=$data/x bs=512 count=8
+pool=$1
+
+zfs create $pool/data
+
+dd if=/dev/urandom of=/$pool/data/x bs=512 count=8
 
 gdrive_folder_name="haven-test $(date)"
-haven-b-init $repo $gdrive_folder_name > $tmp/backupspec.json
 
-haven-b-backup $tmp/backupspec.json $data firstbackup
-haven-b-backup $tmp/backupspec.json $data secondbackup
+zfs snapshot $pool/data@1
+haven-b-backup $pool/data@1 firstbackup
+echo zwei > /$pool/data/x
+zfs snapshot $pool/data@2
+expected=$(cd /$pool/data; tar c * | sha1sum)
+haven-b-backup $pool/data@2 secondbackup > /tmp/bupname
 
+sleep 4
 # now, a crash happens
-rm -fr $tmp/repo
+zfs destroy -fr $pool/data
 
 # now attempt to restore
-haven-b-restore $tmp/backupspec.json secondbackup $tmp/restored
+haven-b-gdrive download --stdout -i $(cat /tmp/bupname) | unxz | zfs recv $pool/data@2
 
-expected=$(cd $data; tar c * | sha1sum)
-actual=$(cd $tmp/restored; tar c * | sha1sum)
+actual=$(cd /$pool/data/.zfs/snapshots/2; tar c * | sha1sum)
 
 if [ "$expected" != "$actual" ]; then
   echo expected $expected, but got $actual

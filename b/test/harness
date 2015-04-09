@@ -27,7 +27,13 @@ if [ -e .env ]; then
   export $(cut -d= -f1 .env)
 fi
 
-. test/t-dataroundtrip.sh
-. test/t-resumerestore.sh
+vdev=$(mktemp /tmp/testpoolvdevXXXXXX)
+dd if=/dev/zero of=$vdev bs=512 count=800000
+pool=$(basename $vdev)
+zpool create $pool $vdev
+# schedule unlink
+rm $vdev
+
+. test/t-dataroundtrip.sh $pool
 
 echo "all tests passed!"

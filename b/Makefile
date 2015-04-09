@@ -1,5 +1,5 @@
 gobins := haven-b-upload
-shbins :=
+shbins := haven-b-backup haven-b-restore
 outgo := $(foreach bin,$(gobins),out/$(bin))
 outsh := $(foreach bin,$(shbins),out/$(bin))
 

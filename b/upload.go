@@ -3,6 +3,10 @@ package main
 import (
   "golang.org/x/oauth2"
   "golang.org/x/oauth2/google"
+  "github.com/cenkalti/backoff"
+  "github.com/pivotal-golang/bytefmt"
+
+  "time"
   "encoding/json"
   "net/http"
   "io/ioutil"
@@ -10,20 +14,26 @@ import (
   "crypto/md5"
   "encoding/hex"
   "math"
-
   "log"
   "fmt"
   "os/user"
   "io"
   "os"
+  "strconv"
 )
 
+// use 16M chunk size .. ?
+const PreferredChunkSize = 1024 * 1024 * 1
+
 func main() {
-  zero, _ := os.Open("/dev/zero")
-  upload(&io.LimitedReader{N: 1024*1024*2, R: zero}, "zerotest")
+  zero, _ := os.Open("/dev/urandom")
+  id := upload(&io.LimitedReader{N: 1024*1024*2, R: zero}, "zerotest")
+  // output just the ID
+  fmt.Printf("%s\n", id)
 }
 
-func upload(in_raw io.Reader, filename string) {
+/// Returns the Google Drive ID of the created file on success, panics on error.
+func upload(in_raw io.Reader, filename string) string {
   counter := io.LimitedReader{N: math.MaxInt64, R: in_raw}
   hash := md5.New()
   in := io.TeeReader(&counter, hash)
@@ -32,16 +42,15 @@ func upload(in_raw io.Reader, filename string) {
 
   var metadataJson = []byte(`{"title":"Buy cheese and bread for breakfast."}`)
 
+  // Don't bother with retrying this first request; if the network is down, we can safely fail
+  // and we probably have failed at the OAuth stage already.
   r, err := client.Post("https://www.googleapis.com/upload/drive/v2/files?uploadType=resumable",
     "application/json; charset=UTF-8",
     bytes.NewBuffer(metadataJson))
   if err != nil { log.Fatalln(err)}
   if r.StatusCode != http.StatusOK { log.Fatalln("failed to create upload") }
   uploadUrl := r.Header.Get("Location")
-  log.Println("upload is", uploadUrl)
-
-  // use 16M chunk size .. ?
-  const PreferredChunkSize = 1024 * 1024 // * 16
+  log.Println("Metadata sent, starting upload...")
 
   var chunk bytes.Buffer
   var slop bytes.Buffer
@@ -51,9 +60,15 @@ func upload(in_raw io.Reader, filename string) {
   // However, buffer and chunk sizes are ints, as that's what golang uses for
   // memory management. Think twice if you feel like you have to cast
   // int64->int somewhere.
+  // TODO: size_t is likely unsigned, should we settle for uint64 as well?
+
+  // The current estimate for the total size of the input.
+  // After the following loop terminates, it will be accurate.
   var total_size int64
 
+  // The byte offset of byte following the one that was last sent to the server.
   var chunkoffs int64
+
   for {
     chunk.Reset()
     chunksize, err := io.Copy(&chunk, &io.LimitedReader{N: PreferredChunkSize, R: in})
@@ -70,8 +85,7 @@ func upload(in_raw io.Reader, filename string) {
     nextoffs := chunkoffs + int64(done_in_chunk)
     req, err := http.NewRequest("PUT", uploadUrl, bytes.NewReader(chunk.Bytes()[done_in_chunk:]))
     req.Header.Set("Content-Range", fmt.Sprintf("bytes %d-%d/*", nextoffs, chunkoffs+int64(len(chunk.Bytes())-1)))
-    resp, err := client.Do(req)
-    log.Println(resp, err)
+    resp, err := doWithRetry(client,req,308)
     if err != nil { log.Fatalln(err)}
     if resp.StatusCode != 308 { log.Fatalln("failed to upload chunk") }
     var reported_start int64
@@ -88,11 +102,12 @@ func upload(in_raw io.Reader, filename string) {
       log.Fatalln("insane reported_end, expected",chunkoffs+chunksize-1,"got",reported_end)
     }
 
-    log.Println("uploaded chunk from",chunkoffs,"to",chunkoffs+chunksize)
+    s := fmt.Sprintf("(%s in)", bytefmt.ByteSize(uint64(chunkoffs+chunksize)))
+    log.Println("Uploaded chunk",chunkoffs,"--",chunkoffs+chunksize,s)
     chunkoffs += chunksize
   }
 
-  log.Println("reached EOF, finishing..")
+  log.Println("Reached end of input, finalizing..")
 
   // There might be some leftovers from the next-to-last chunk that we have to
   // flush now, they are stored in `slop`.
@@ -103,12 +118,11 @@ func upload(in_raw io.Reader, filename string) {
   if slop.Len() == 0 {
     bytes_here = "*"
   } else {
+    log.Println("Uploading",slop.Len(),"remaining bytes..")
     bytes_here = fmt.Sprintf("%d-%d",total_size-int64(slop.Len()),total_size-1)
   }
   req.Header.Set("Content-Range", fmt.Sprintf("bytes %s/%d", bytes_here, total_size))
-  log.Println(req)
-  resp, err := client.Do(req)
-  log.Println(resp, err)
+  resp, err := doWithRetry(client,req,200)
   if err != nil { log.Fatalln(err)}
   if resp.StatusCode != 200 {
     x, err := ioutil.ReadAll(resp.Body)
@@ -116,11 +130,12 @@ func upload(in_raw io.Reader, filename string) {
     log.Fatalln("failed to finalize upload", string(x))
   }
   outputMetadataJson, err := ioutil.ReadAll(resp.Body)
+  //log.Println(string(outputMetadataJson))
   if err != nil { log.Fatalln(err)}
   var meta GdriveFileMeta
   err = json.Unmarshal(outputMetadataJson, &meta)
   if err != nil { log.Fatalln(err)}
-  log.Println("Google has all",total_size,"bytes")
+  log.Println("OK, Google has all",total_size,"bytes")
 
 
   // Sanity check 1:
@@ -147,12 +162,59 @@ func upload(in_raw io.Reader, filename string) {
   if expected_md5 != actual_md5 {
     log.Fatalln("final md5 check failed: expected",expected_md5,"but Google has",actual_md5)
   } else {
-    log.Println("hash check passed --",expected_md5)
+    log.Println("OK, MD5 check passed --",expected_md5)
   }
+
+  if meta.Id == "" {
+    log.Fatalln("file doesn't have an ID!")
+  }
+
+  if meta.Size != strconv.FormatInt(total_size, 10) {
+    log.Fatalln("reported file size is",meta.Size," -- but expected to have",total_size)
+  }
+
+  return meta.Id
 }
 
 type GdriveFileMeta struct {
   Md5 string `json:"md5Checksum"`
+  Size string `json:"fileSize"`
+  Id string `json:"id"`
+}
+
+// Our backoff parameters, chosen to allow grotesquely long intervals.
+// It's not like anyone else cares (or should care!) -- if you pipe `zfs send` or `tar`
+// into this, they can wait as long as needed.
+var timer = &backoff.ExponentialBackOff {
+  InitialInterval:     500 * time.Millisecond,
+  RandomizationFactor: 0.5,
+  Multiplier:          1.5,
+  MaxInterval:         1 * time.Minute,
+  MaxElapsedTime:      24 * time.Hour, // Google deletes the temp state after 1d, so it doesn't make much sense to wait longer
+  Clock:               backoff.SystemClock,
+}
+
+func doWithRetry(client *http.Client, req *http.Request, expectedStatus int) (*http.Response, error) {
+  var resp *http.Response
+  i := 0
+  err := backoff.Retry(func() error {
+    i++
+    var int_err error
+    resp, int_err = client.Do(req)
+    if int_err == nil && resp.StatusCode != expectedStatus {
+      int_err = fmt.Errorf("expected status %d, but got %d", expectedStatus, resp.StatusCode)
+    }
+    if int_err != nil {
+      log.Println("Attempt",i,"failed:",int_err)
+    }
+    return int_err
+  }, timer)
+
+  if err != nil {
+    return nil, err
+  } else {
+    return resp, nil
+  }
 }
 
 

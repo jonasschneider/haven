@@ -8,4 +8,4 @@ snapshot=$1
 filename=$(date "+%Y-%m-%d-%H-%M")-$2.zfs.xz.gpg
 gdrive_folder="0B7l3QydqgCmffjQ5aFBqT3BIOVhPNVdNWUwzZUpNbERRUFF6b3NUUVFzTTlOaEJfVUkzZEE"
 
-zfs send $snapshot | xz | haven-b-upload $filename $gdrive_folder
+zfs send $snapshot | xz | gpg -e -r mail@jonasschneider.com --cipher-algo AES256 --compress-algo none | haven-b-upload $filename $gdrive_folder

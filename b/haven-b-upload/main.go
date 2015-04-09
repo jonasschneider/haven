@@ -71,7 +71,7 @@ func upload(in_raw io.Reader, filename, folder_id string) string {
 	}
 
 	// I really want to do this properly, but parents is an array and I hate that.
-	var metadataJson = []byte(fmt.Sprintf(`{"title":"%s", "parents":["%s"]}`, filename, folder_id))
+	var metadataJson = []byte(fmt.Sprintf(`{"title":"%s", "parents":[{"kind": "drive#fileLink","id": "%s"}]}`, filename, folder_id))
 
 	// Don't bother with retrying this first request; if the network is down, we can safely fail
 	// and we probably have failed at the OAuth stage already.

@@ -2,36 +2,37 @@
 	"ImportPath": "github.com/jonasschneider/haven/b",
 	"GoVersion": "go1.2.1",
 	"Packages": [
-		"github.com/jonasschneider/haven/b/...",
-		"github.com/prasmussen/gdrive"
+		"github.com/jonasschneider/haven/b/..."
 	],
 	"Deps": [
 		{
-			"ImportPath": "code.google.com/p/goauth2/oauth",
-			"Comment": "weekly-56",
-			"Rev": "afe77d958c701557ec5dc56f6936fcc194d15520"
+			"ImportPath": "github.com/cenkalti/backoff",
+			"Rev": "9831e1e25c874e0a0601b6dc43641071414eec7a"
 		},
 		{
-			"ImportPath": "github.com/boltdb/bolt",
-			"Comment": "v1.0-43-gcf33c9e",
-			"Rev": "cf33c9e0ca0a23509b8bb8edfc63e4776bb1a330"
+			"ImportPath": "github.com/docopt/docopt-go",
+			"Comment": "0.6.1-5-g854c423",
+			"Rev": "854c423c810880e30b9fecdabb12d54f4a92f9bb"
 		},
 		{
-			"ImportPath": "github.com/prasmussen/google-api-go-client/drive/v2",
-			"Rev": "4e530b3dd03d1049ad3179cedf93f6f49024da54"
-		},
-		{
-			"ImportPath": "github.com/voxelbrain/goptions",
-			"Comment": "2.5.10",
-			"Rev": "68583de33d9209ba795a0a334dad27418e4c18f5"
+			"ImportPath": "github.com/pivotal-golang/bytefmt",
+			"Rev": "eb6a478daea5cd564c230719240761a1a2ccc713"
 		},
 		{
 			"ImportPath": "golang.org/x/net/context",
 			"Rev": "6dc0abcce25682504770fa9a7a6705bbfdebfa48"
 		},
 		{
-			"ImportPath": "google.golang.org/api/googleapi",
-			"Rev": "a59c1355aff5abf0f60c182f9fe9b8acb31ac40e"
+			"ImportPath": "golang.org/x/oauth2",
+			"Rev": "ce5ea7da934b76b1066c527632359e2b8f65db97"
+		},
+		{
+			"ImportPath": "google.golang.org/cloud/compute/metadata",
+			"Rev": "c97f5f9979a8582f3ab72873a51979619801248b"
+		},
+		{
+			"ImportPath": "google.golang.org/cloud/internal",
+			"Rev": "c97f5f9979a8582f3ab72873a51979619801248b"
 		}
 	]
 }

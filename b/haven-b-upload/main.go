@@ -257,6 +257,16 @@ func doWithRetry(client *http.Client, req *http.Request, body bytes.Buffer, expe
 		}
 		if int_err != nil {
 			log.Println("Attempt", i, "failed:", int_err)
+			log.Println(req)
+			log.Println(resp)
+			if resp != nil {
+				slurp, serr := ioutil.ReadAll(resp.Body)
+				if serr != nil {
+					log.Println("Also, failed to slurp response body")
+				} else {
+					log.Println(string(slurp))
+				}
+			}
 		}
 		return int_err
 	}, timer)

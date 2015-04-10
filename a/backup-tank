@@ -5,13 +5,9 @@ set -ux
 OPTIONS="--full-if-older-than 3M --allow-source-mismatch --volsize 100 -vnotice"
 
 # Where to backup to
-TARGETBASE=swift://duplicity-qubit
+TARGETBASE=cf+hubic://`hostname`-haven-a
 
 export PASSPHRASE=$(cat /.backupkey)
-
-export SWIFT_USERNAME=a
-export SWIFT_PASSWORD=a
-export SWIFT_AUTHURL=http://localhost:6666
 
 function backup_zfs
 {

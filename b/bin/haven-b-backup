@@ -2,10 +2,10 @@
 
 set -eux
 set -o pipefail
-shopt -s dotglob
 
 snapshot=$1
 filename=$(date "+%Y-%m-%d-%H-%M")-$2.zfs.xz.gpg
-gdrive_folder="0B7l3QydqgCmffjQ5aFBqT3BIOVhPNVdNWUwzZUpNbERRUFF6b3NUUVFzTTlOaEJfVUkzZEE"
+gdrive_folder=0B7l3QydqgCmffi0za0NPMnpFbUF3aU5UbjJCVHBCV0dUWDhlRE5EdnFsV0JILVYyMU1ZOVk
+recipient_keyname=mail@jonasschneider.com
 
-zfs send $snapshot | xz | gpg -e -r mail@jonasschneider.com --cipher-algo AES256 --compress-algo none | haven-b-upload $filename $gdrive_folder
+zfs send $snapshot | xz | gpg -e -r $recipient_keyname --cipher-algo AES256 --compress-algo none | haven-b-upload $filename $gdrive_folder

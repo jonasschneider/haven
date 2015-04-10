@@ -120,9 +120,9 @@ func upload(in_raw io.Reader, filename, folder_id string) string {
 
 		done_in_chunk := 0
 		nextoffs := chunkoffs + int64(done_in_chunk)
-		req, err := http.NewRequest("PUT", uploadUrl, bytes.NewReader(chunk.Bytes()[done_in_chunk:]))
+		req, err := http.NewRequest("PUT", uploadUrl, nil)
 		req.Header.Set("Content-Range", fmt.Sprintf("bytes %d-%d/*", nextoffs, chunkoffs+int64(len(chunk.Bytes())-1)))
-		resp, err := doWithRetry(client, req, 308)
+		resp, err := doWithRetry(client, req, chunk, 308)
 		if err != nil {
 			log.Fatalln(err)
 		}
@@ -154,7 +154,7 @@ func upload(in_raw io.Reader, filename, folder_id string) string {
 	// flush now, they are stored in `slop`.
 	// Now send the final chunk including the total size. Google will complain if we
 	// screwed up the ranges somewhere in between.
-	req, err := http.NewRequest("PUT", uploadUrl, &slop)
+	req, err := http.NewRequest("PUT", uploadUrl, nil)
 	var bytes_here string
 	if slop.Len() == 0 {
 		bytes_here = "*"
@@ -163,7 +163,7 @@ func upload(in_raw io.Reader, filename, folder_id string) string {
 		bytes_here = fmt.Sprintf("%d-%d", total_size-int64(slop.Len()), total_size-1)
 	}
 	req.Header.Set("Content-Range", fmt.Sprintf("bytes %s/%d", bytes_here, total_size))
-	resp, err := doWithRetry(client, req, 200)
+	resp, err := doWithRetry(client, req, slop, 200)
 	if err != nil {
 		log.Fatalln(err)
 	}
@@ -239,11 +239,17 @@ var timer = &backoff.ExponentialBackOff{
 	Clock:               backoff.SystemClock,
 }
 
-func doWithRetry(client *http.Client, req *http.Request, expectedStatus int) (*http.Response, error) {
+func doWithRetry(client *http.Client, req *http.Request, body bytes.Buffer, expectedStatus int) (*http.Response, error) {
 	var resp *http.Response
 	i := 0
 	err := backoff.Retry(func() error {
 		i++
+
+		// Create a new reader every time so that we correctly rewind to the
+		// beginning of the buffer on every retry.
+		req.Body = ioutil.NopCloser(bytes.NewReader(body.Bytes()))
+		req.ContentLength = int64(body.Len())
+
 		var int_err error
 		resp, int_err = client.Do(req)
 		if int_err == nil && resp.StatusCode != expectedStatus {

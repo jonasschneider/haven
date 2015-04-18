@@ -235,8 +235,6 @@ func uploadChunk(uploadUrl string, chunk []byte, offset int64, reported_total_si
 	done_in_chunk := 0
 	chunksize := len(chunk)
 
-	first := true
-
 	range_md5 := ""
 
 	for done_in_chunk < chunksize {
@@ -245,13 +243,9 @@ func uploadChunk(uploadUrl string, chunk []byte, offset int64, reported_total_si
 		if err != nil {
 			log.Fatalln(err)
 		}
-		end := chunksize-1
-		if first {
-			first = false
-			end = chunksize-1-256*1024
-		}
-		req.Header.Set("Content-Range", fmt.Sprintf("bytes %d-%d/%s", nextoffs, offset+int64(end), reported_total_size_fmt))
-		resp, err := doWithRetry(req, chunk[done_in_chunk:(end+1)], []int{308, 201, 200, 503})
+
+		req.Header.Set("Content-Range", fmt.Sprintf("bytes %d-%d/%s", nextoffs, offset+int64(chunksize-1), reported_total_size_fmt))
+		resp, err := doWithRetry(req, chunk[done_in_chunk:], []int{308, 201, 200, 503})
 		if err != nil {
 			log.Fatalln(err)
 		}

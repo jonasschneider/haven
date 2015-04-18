@@ -26,6 +26,8 @@ import (
 // use 16M chunk size .. ?
 const PreferredChunkSize = 1024 * 1024 * 16
 
+var client *http.Client
+
 func main() {
 	usage := `Upload a large stream from stdin to Google Drive.
 
@@ -48,7 +50,11 @@ Options:
 
 	// Try to get a client here. This will start the OAuth2 flow.
 	// Do this before doing the terminal check so that we *can* use a terminal for this.
-	getAuthenticatedClient()
+	client, err = getAuthenticatedClient()
+	if err != nil {
+		log.Fatalln(err)
+	}
+
 
 	stat, _ := os.Stdin.Stat()
 	if (stat.Mode() & os.ModeCharDevice) != 0 {
@@ -65,10 +71,6 @@ func upload(in_raw io.Reader, filename, folder_id string) string {
 	counter := io.LimitedReader{N: math.MaxInt64, R: in_raw}
 	hash := md5.New()
 	in := io.TeeReader(&counter, hash)
-	client, err := getAuthenticatedClient()
-	if err != nil {
-		log.Fatalln(err)
-	}
 
 	// I really want to do this properly, but parents is an array and I hate that.
 	var metadataJson = []byte(fmt.Sprintf(`{"title":"%s", "parents":[{"kind": "drive#fileLink","id": "%s"}]}`, filename, folder_id))
@@ -88,7 +90,6 @@ func upload(in_raw io.Reader, filename, folder_id string) string {
 	log.Println("Metadata sent, starting upload...")
 
 	var chunk bytes.Buffer
-	var slop bytes.Buffer
 	chunk.Grow(PreferredChunkSize)
 
 	// A word on sizes: the total sizes are int64 for .. you know, scalability.
@@ -101,10 +102,12 @@ func upload(in_raw io.Reader, filename, folder_id string) string {
 	// After the following loop terminates, it will be accurate.
 	var total_size int64
 
-	// The byte offset of byte following the one that was last sent to the server.
+	// The byte offset of the byte following the one that was last sent to the server.
 	var chunkoffs int64
 
-	for {
+	eof := false
+
+	for !eof {
 		chunk.Reset()
 		chunksize, err := io.Copy(&chunk, &io.LimitedReader{N: PreferredChunkSize, R: in})
 		if err != nil {
@@ -113,35 +116,17 @@ func upload(in_raw io.Reader, filename, folder_id string) string {
 		total_size += chunksize
 		if chunksize != PreferredChunkSize {
 			// Short read; that means we've reached EOF (since err is nil).
-			// The routine after this loop will take care of sending this short-sized chunk.
-			slop = chunk
-			break
+			// Send this chunk, then we're done.
+			eof = true
 		}
 
-		done_in_chunk := 0
-		nextoffs := chunkoffs + int64(done_in_chunk)
-		req, err := http.NewRequest("PUT", uploadUrl, nil)
-		req.Header.Set("Content-Range", fmt.Sprintf("bytes %d-%d/*", nextoffs, chunkoffs+int64(len(chunk.Bytes())-1)))
-		resp, err := doWithRetry(client, req, chunk, 308)
-		if err != nil {
-			log.Fatalln(err)
+		// only report the total size when finishing
+		var reported_total_size int64
+		if eof {
+			reported_total_size = total_size
 		}
-		if resp.StatusCode != 308 {
-			log.Fatalln("failed to upload chunk")
-		}
-		var reported_start int64
-		var reported_end int64
-		n, err := fmt.Sscanf(resp.Header.Get("Range"), "bytes=%d-%d", &reported_start, &reported_end)
-		if err != nil || n != 2 {
-			log.Fatalln("failed to parse Range header", resp.Header.Get("Range"))
-		}
-		if reported_start != 0 {
-			log.Fatalln("insane reported_start, expected", 0, "got", reported_start)
-		}
-		if reported_end != chunkoffs+int64(chunksize-1) {
-			// let's not deal with partially uploaded chunks for now
-			log.Fatalln("insane reported_end, expected", chunkoffs+chunksize-1, "got", reported_end)
-		}
+
+		uploadChunk(uploadUrl, chunk.Bytes(), chunkoffs, reported_total_size)
 
 		s := fmt.Sprintf("(%s in)", bytefmt.ByteSize(uint64(chunkoffs+chunksize)))
 		log.Println("Uploaded chunk", chunkoffs, "--", chunkoffs+chunksize, s)
@@ -150,20 +135,10 @@ func upload(in_raw io.Reader, filename, folder_id string) string {
 
 	log.Println("Reached end of input, finalizing..")
 
-	// There might be some leftovers from the next-to-last chunk that we have to
-	// flush now, they are stored in `slop`.
-	// Now send the final chunk including the total size. Google will complain if we
-	// screwed up the ranges somewhere in between.
+	// fetch the upload status one last time
 	req, err := http.NewRequest("PUT", uploadUrl, nil)
-	var bytes_here string
-	if slop.Len() == 0 {
-		bytes_here = "*"
-	} else {
-		log.Println("Uploading", slop.Len(), "remaining bytes..")
-		bytes_here = fmt.Sprintf("%d-%d", total_size-int64(slop.Len()), total_size-1)
-	}
-	req.Header.Set("Content-Range", fmt.Sprintf("bytes %s/%d", bytes_here, total_size))
-	resp, err := doWithRetry(client, req, slop, 200)
+	req.Header.Set("Content-Range", fmt.Sprintf("bytes */%d", total_size))
+	resp, err := doWithRetry(req, []byte{}, []int{200})
 	if err != nil {
 		log.Fatalln(err)
 	}
@@ -175,7 +150,6 @@ func upload(in_raw io.Reader, filename, folder_id string) string {
 		log.Fatalln("failed to finalize upload", string(x))
 	}
 	outputMetadataJson, err := ioutil.ReadAll(resp.Body)
-	//log.Println(string(outputMetadataJson))
 	if err != nil {
 		log.Fatalln(err)
 	}
@@ -235,25 +209,123 @@ var timer = &backoff.ExponentialBackOff{
 	RandomizationFactor: 0.5,
 	Multiplier:          1.5,
 	MaxInterval:         1 * time.Minute,
-	MaxElapsedTime:      24 * time.Hour, // Google deletes the temp state after 1d, so it doesn't make much sense to wait longer
+	MaxElapsedTime:      30 * time.Hour, // Google deletes the temp state after 1d, so it doesn't make much sense to wait longer
 	Clock:               backoff.SystemClock,
 }
 
-func doWithRetry(client *http.Client, req *http.Request, body bytes.Buffer, expectedStatus int) (*http.Response, error) {
+func uploadChunk(uploadUrl string, chunk []byte, offset int64, reported_total_size int64) {
+	reported_total_size_fmt := "*"
+	if reported_total_size != 0 {
+		reported_total_size_fmt = fmt.Sprintf("%d", reported_total_size)
+	}
+	done_in_chunk := 0
+	chunksize := len(chunk)
+
+	first := true
+
+	for done_in_chunk < chunksize {
+		nextoffs := offset + int64(done_in_chunk)
+		req, err := http.NewRequest("PUT", uploadUrl, nil)
+		if err != nil {
+			log.Fatalln(err)
+		}
+		end := chunksize-1
+		if first {
+			first = false
+			end = chunksize-1-256*1024
+		}
+		req.Header.Set("Content-Range", fmt.Sprintf("bytes %d-%d/%s", nextoffs, offset+int64(end), reported_total_size_fmt))
+		resp, err := doWithRetry(req, chunk[done_in_chunk:(end+1)], []int{308, 201, 200, 503})
+		if err != nil {
+			log.Fatalln(err)
+		}
+		if resp.StatusCode == 201 || resp.StatusCode == 200 {
+			log.Println("(uploaded the final chunk -- not checking ranges)")
+			// the final chunk doesn't even include the range -- so we can't check it here.
+			// let's just assume everything has gone right..?
+			return
+		} else if resp.StatusCode == 503 {
+			log.Println("Upload was interrupted... let's see if we can recover")
+			// do a lookup request to see where we're at
+			lookup_req, err := http.NewRequest("PUT", uploadUrl, nil)
+			lookup_req.Header.Set("Content-Range", fmt.Sprintf("bytes */%s", reported_total_size_fmt))
+			resp, err = doWithRetry(lookup_req, []byte{}, []int{308, 201, 200})
+			if err != nil {
+				log.Fatalln(err)
+			}
+
+			// we don't look at `resp` here, but the range calculation code below does
+		} else {
+			// it's not the last chunk, so bail if Google doesn't tell about incomplete updates
+			if resp.StatusCode != 308 {
+				log.Fatalln("failed to upload chunk")
+			}
+		}
+
+		// Check the range google reports and update our current state
+		var reported_start int64
+		var reported_end int64
+		n, err := fmt.Sscanf(resp.Header.Get("Range"), "bytes=%d-%d", &reported_start, &reported_end)
+		if err != nil || n != 2 {
+			log.Fatalln("failed to parse Range header", resp.Header.Get("Range"))
+		}
+		if reported_start != 0 {
+			log.Fatalln("insane reported_start, expected", 0, "got", reported_start)
+		}
+		end_of_chunk := offset+int64(chunksize-1)
+
+		// Calculate how many bytes from the chunk didn't get uploaded yet.
+		// This can happen when the upload gets interrupted... sigh.
+		// The `int` cast is safe since chunksize < MAX_INT.
+		bytes_missing_from_chunk := int(end_of_chunk - reported_end)
+		if bytes_missing_from_chunk < 0 {
+			log.Fatalln("insane reported_end; chunk_end is at", end_of_chunk, "but Google says it has until", reported_end)
+		}
+
+		if bytes_missing_from_chunk > 0 {
+			log.Println("Chunk was partially uploaded (missing",bytes_missing_from_chunk,"bytes), recovering..")
+		}
+
+		done_in_chunk = chunksize-bytes_missing_from_chunk
+
+		// Add 1 since done_in_chunk points to the next unsent byte, while reported_end
+		// points to the last sent one.
+		if int64(done_in_chunk) != (reported_end+1)-offset {
+			log.Fatalln("failed to calculate chunk boundary; expected to be done with",done_in_chunk,"but Google says we're at",reported_end+1-offset)
+		}
+
+		if done_in_chunk < chunksize {
+			log.Println("... done with",done_in_chunk,"out of the",chunksize,"bytes in the chunk")
+		}
+	}
+}
+
+func doWithRetry(req *http.Request, body []byte, allowedStatuses []int) (*http.Response, error) {
 	var resp *http.Response
 	i := 0
 	err := backoff.Retry(func() error {
 		i++
+		log.Println("Trying:",req,"with",len(body))
 
 		// Create a new reader every time so that we correctly rewind to the
 		// beginning of the buffer on every retry.
-		req.Body = ioutil.NopCloser(bytes.NewReader(body.Bytes()))
-		req.ContentLength = int64(body.Len())
+		req.Body = ioutil.NopCloser(bytes.NewReader(body))
+		req.ContentLength = int64(len(body))
 
 		var int_err error
 		resp, int_err = client.Do(req)
-		if int_err == nil && resp.StatusCode != expectedStatus {
-			int_err = fmt.Errorf("expected status %d, but got %d", expectedStatus, resp.StatusCode)
+		log.Println("Got",resp)
+		if int_err == nil {
+			ok := false
+			for _, i := range allowedStatuses {
+				if resp.StatusCode == i {
+					ok = true
+					break
+				}
+			}
+			if !ok {
+				int_err = fmt.Errorf("got status %d, expected within %x", resp.StatusCode, allowedStatuses)
+			}
 		}
 		if int_err != nil {
 			log.Println("Attempt", i, "failed:", int_err)

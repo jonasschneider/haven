@@ -126,11 +126,25 @@ func upload(in_raw io.Reader, filename, folder_id string) string {
 			reported_total_size = total_size
 		}
 
-		uploadChunk(uploadUrl, chunk.Bytes(), chunkoffs, reported_total_size)
+		actual_range_md5 := uploadChunk(uploadUrl, chunk.Bytes(), chunkoffs, reported_total_size)
 
 		s := fmt.Sprintf("(%s in)", bytefmt.ByteSize(uint64(chunkoffs+chunksize)))
 		log.Println("Uploaded chunk", chunkoffs, "--", chunkoffs+chunksize, s)
 		chunkoffs += chunksize
+
+		if actual_range_md5 != "" {
+			expected_range_md5 := hex.EncodeToString(hash.Sum(nil))
+			if actual_range_md5 != expected_range_md5 {
+				log.Fatalln("Range MD5 doesn't match: expected",expected_range_md5,"but got",actual_range_md5)
+			} else {
+				log.Println("Range MD5 OK --",expected_range_md5)
+			}
+		} else {
+			// the last chunk doesn't carry a range md5
+			if !eof {
+				log.Fatalln("No range MD5 was returned, but not eof?")
+			}
+		}
 	}
 
 	log.Println("Reached end of input, finalizing..")
@@ -213,7 +227,7 @@ var timer = &backoff.ExponentialBackOff{
 	Clock:               backoff.SystemClock,
 }
 
-func uploadChunk(uploadUrl string, chunk []byte, offset int64, reported_total_size int64) {
+func uploadChunk(uploadUrl string, chunk []byte, offset int64, reported_total_size int64) string {
 	reported_total_size_fmt := "*"
 	if reported_total_size != 0 {
 		reported_total_size_fmt = fmt.Sprintf("%d", reported_total_size)
@@ -222,6 +236,8 @@ func uploadChunk(uploadUrl string, chunk []byte, offset int64, reported_total_si
 	chunksize := len(chunk)
 
 	first := true
+
+	range_md5 := ""
 
 	for done_in_chunk < chunksize {
 		nextoffs := offset + int64(done_in_chunk)
@@ -243,7 +259,8 @@ func uploadChunk(uploadUrl string, chunk []byte, offset int64, reported_total_si
 			log.Println("(uploaded the final chunk -- not checking ranges)")
 			// the final chunk doesn't even include the range -- so we can't check it here.
 			// let's just assume everything has gone right..?
-			return
+			// Also, don't return an x-range value.
+			return ""
 		} else if resp.StatusCode == 503 {
 			log.Println("Upload was interrupted... let's see if we can recover")
 			// do a lookup request to see where we're at
@@ -261,6 +278,9 @@ func uploadChunk(uploadUrl string, chunk []byte, offset int64, reported_total_si
 				log.Fatalln("failed to upload chunk")
 			}
 		}
+
+		// At the end, we'll return the most recent range md5
+		range_md5 = resp.Header.Get("X-Range-Md5")
 
 		// Check the range google reports and update our current state
 		var reported_start int64
@@ -298,6 +318,8 @@ func uploadChunk(uploadUrl string, chunk []byte, offset int64, reported_total_si
 			log.Println("... done with",done_in_chunk,"out of the",chunksize,"bytes in the chunk")
 		}
 	}
+
+	return range_md5
 }
 
 func doWithRetry(req *http.Request, body []byte, allowedStatuses []int) (*http.Response, error) {

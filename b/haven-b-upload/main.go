@@ -136,8 +136,6 @@ func upload(in_raw io.Reader, filename, folder_id string) string {
 			expected_range_md5 := hex.EncodeToString(hash.Sum(nil))
 			if actual_range_md5 != expected_range_md5 {
 				log.Fatalln("Range MD5 doesn't match: expected",expected_range_md5,"but got",actual_range_md5)
-			} else {
-				log.Println("Range MD5 OK --",expected_range_md5)
 			}
 		} else {
 			// the last chunk doesn't carry a range md5

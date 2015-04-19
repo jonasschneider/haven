@@ -21,7 +21,6 @@ import (
 	"os/user"
 	"strconv"
 	"time"
-	"bufio"
 )
 
 // use 16M chunk size .. ?
@@ -69,8 +68,7 @@ Options:
 /// Returns the Google Drive ID of the created file on success, panics on error.
 /// `filename` may not contain JSON escape sequences (" and \).
 func upload(in_raw io.Reader, filename, folder_id string) string {
-	buffered := bufio.NewReaderSize(in_raw, 2*PreferredChunkSize)
-	counter := io.LimitedReader{N: math.MaxInt64, R: buffered}
+	counter := io.LimitedReader{N: math.MaxInt64, R: in_raw}
 	hash := md5.New()
 	in := io.TeeReader(&counter, hash)
 

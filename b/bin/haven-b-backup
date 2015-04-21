@@ -1,12 +1,24 @@
 #!/bin/bash
 
+## Make sure to set the following env variables:
+## snapshot:      name of the zfs snapshot to back up, e.g. "tank@mysnap"
+## name:          filename part to describe the backup, e.g. "tank-at-mysnap"
+## gdrive_folder: Google Drive ID of the folder to put the file into,
+##                e.g. "0B7l3QydqgCmffi0za0NPMnpFbUF" (might be longer)
+## recipient:     GPG keyname of the recipient to encrypt the data to,
+##                e.g. "mail@jonasschneider.com" (make sure that
+##                `echo lol | gpg -e -r $recipient` works)
+
 set -eu
 set -o pipefail
 
-snapshot=$1
-filename=$(date "+%Y-%m-%d-%H-%M")-$2.zfs.xz.gpg
-gdrive_folder=0B7l3QydqgCmffi0za0NPMnpFbUF3aU5UbjJCVHBCV0dUWDhlRE5EdnFsV0JILVYyMU1ZOVk
-recipient_keyname=mail@jonasschneider.com
+# bail if things are missing
+x=$snapshot
+x=$name
+x=$gdrive_folder
+x=$recipient
+
+filename=$(date "+%Y-%m-%d-%H-%M")-$name.zfs.xz.gpg
 hashfile=$(mktemp /tmp/hashfileXXXXXXXXX)
 sizefile=$(mktemp /tmp/sizefileXXXXXXXXX)
 start_t=$(date)
@@ -15,7 +27,7 @@ zfs send $snapshot \
   | tee >(sha256sum > $hashfile) \
   | tee >(wc -c > $sizefile) \
   | xz \
-  | gpg -e -r $recipient_keyname --cipher-algo AES256 --compress-algo none \
+  | gpg -e -r $recipient --cipher-algo AES256 --compress-algo none \
   | buffer -m 32M -s 512K \
   | haven-b-upload $filename $gdrive_folder \
   | read gdrive_fileid
@@ -28,8 +40,8 @@ rm $sizefile
 echo "========================================================"
 echo "Completed Backup: $filename"
 echo "Of ZFS snapshot:  $snapshot"
-echo "ZFS stream size:  $thesize"
-echo "ZFS stream SHA1:  $thehash"
+echo "Stream size:      $thesize"
+echo "Stream sha256sum: $thehash"
 echo "Encrypted to:     $recipient_keyname"
 echo "In GDrive as:     $gdrive_fileid"
 echo "Within folder:    $gdrive_folder"

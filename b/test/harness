@@ -44,5 +44,5 @@ rm $vdev
 
 . test/t-dataroundtrip.sh $pool
 
-sudo zpool destroy $pool
+set +x
 echo "all tests passed!"

@@ -61,13 +61,13 @@ Options:
 		log.Fatalln("Refusing to read from terminal")
 	}
 
-	id := upload(os.Stdin, name, folder_id)
-	fmt.Printf("%s\n", id)
+	id, size, md5 := upload(os.Stdin, name, folder_id)
+	fmt.Printf("%s %d %s\n", id, size, md5)
 }
 
 /// Returns the Google Drive ID of the created file on success, panics on error.
 /// `filename` may not contain JSON escape sequences (" and \).
-func upload(in_raw io.Reader, filename, folder_id string) string {
+func upload(in_raw io.Reader, filename, folder_id string) (string, int64, string) {
 	counter := io.LimitedReader{N: math.MaxInt64, R: in_raw}
 	hash := md5.New()
 	in := io.TeeReader(&counter, hash)
@@ -200,11 +200,16 @@ func upload(in_raw io.Reader, filename, folder_id string) string {
 		log.Fatalln("file doesn't have an ID!")
 	}
 
-	if meta.Size != strconv.FormatInt(total_size, 10) {
-		log.Fatalln("reported file size is", meta.Size, " -- but expected to have", total_size)
+	parsed_size, err := strconv.ParseInt(meta.Size, 10, 64)
+	if err != nil {
+		log.Fatalln(err)
 	}
 
-	return meta.Id
+	if parsed_size != total_size {
+		log.Fatalln("reported file size is", parsed_size, " -- but expected to have", total_size)
+	}
+
+	return meta.Id, total_size, meta.Md5
 }
 
 type GdriveFileMeta struct {

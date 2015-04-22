@@ -5,14 +5,20 @@ set -o pipefail
 
 # Travis CI provisioning..
 if [ -n "${CI:-}" ]; then
-  openssl aes-256-cbc -K $encrypted_0cf3493bd01c_key -iv $encrypted_0cf3493bd01c_iv -in .env.enc -out .env -d
+  openssl aes-256-cbc -K $encrypted_ad436cd0a302_key -iv $encrypted_ad436cd0a302_iv -in .creds.enc -out ~/.haven-b-gdrivecreds -d
   export GOPATH="$HOME/go"
   export PATH="$PATH:$GOPATH/bin"
 
   go get github.com/tools/godep
+
+  # ZFS things
   sudo apt-add-repository --yes ppa:zfs-native/stable
   sudo apt-get update
-  sudo apt-get install buffer gnupg-agent spl-dkms zfs-dkms ubuntu-zfs
+  # do this in stages since otherwise the compilation fails.. sigh
+  sudo apt-get install spl-dkms
+  sudo apt-get install zfs-dkms
+
+  sudo apt-get install buffer gnupg-agent ubuntu-zfs
 
   # ehehehe
   sudo rm /dev/random
@@ -34,12 +40,6 @@ echo hai | gpg -es -r $recipient | gpg -d
 # build & install the thing
 make
 sudo make install
-
-# load env variables if present
-if [ -e .env ]; then
-  source .env
-  export $(cut -d= -f1 .env)
-fi
 
 vdev=$(mktemp /tmp/testpoolvdevXXXXXX)
 dd if=/dev/zero of=$vdev bs=512 count=800000

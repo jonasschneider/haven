@@ -34,8 +34,20 @@ cat $report2
 filename=$(cat $report2|grep "In GDrive as" | cut -d ':' -f 2 | sed -e 's/^[[:space:]]*//' -e 's/[[:space:]]*$//')
 filename=$filename dest_snapshot=$pool/rest2data@restored2 haven-b-restore
 
-actual1=$(cd /$pool/rest1data/.zfs/snapshot/restored1; tar c * | sha1sum)
-actual2=$(cd /$pool/rest2data/.zfs/snapshot/restored2; tar c * | sha1sum)
+# zfs-fuse doesn't implement .zfs (this makes me sad, but we can't run ZoL on travis)
+# what we'd want is this:
+#
+#     checkout1=/$pool/rest1data/.zfs/snapshot/restored1
+#
+# But we'll have to work around by creating a clone of the snapshot so we can see it.. sigh
+sudo zfs clone $pool/rest1data@restored1 $pool/rest1datasnap
+checkout1=/$pool/rest1datasnap
+
+sudo zfs clone $pool/rest2data@restored2 $pool/rest2datasnap
+checkout2=/$pool/rest2datasnap
+
+actual1=$(cd $checkout1; tar c * | sha1sum)
+actual2=$(cd $checkout2; tar c * | sha1sum)
 
 if [ "$expected1" != "$actual1" ]; then
   echo expected $expected1, but got $actual1
@@ -46,7 +58,3 @@ if [ "$expected2" != "$actual2" ]; then
   echo expected $expected2, but got $actual2
   exit 1
 fi
-
-sleep 2
-sudo zfs destroy -fr $pool/rest1data
-sudo zfs destroy -fr $pool/rest2data

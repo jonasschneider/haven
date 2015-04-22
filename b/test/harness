@@ -18,7 +18,9 @@ if [ -n "${CI:-}" ]; then
   sudo apt-get install spl-dkms
   sudo apt-get install zfs-dkms
 
-  sudo apt-get install buffer gnupg-agent ubuntu-zfs
+  sudo apt-get install buffer gnupg-agent ubuntu-zfs golang
+
+  modprobe zfs
 
   # ehehehe
   sudo rm /dev/random

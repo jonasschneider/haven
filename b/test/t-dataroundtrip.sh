@@ -11,18 +11,7 @@ report2=$(mktemp /tmp/reportXXXXXX)
 sudo zfs create $pool/data
 sudo chown `whoami` /$pool/data
 dd if=/dev/urandom of=/$pool/data/x bs=512 count=8
-
-export GNUPGHOME=$(mktemp -d /tmp/gpgXXXXXX)
-echo "Key-Type: RSA
-Key-Length: 1024
-Subkey-Type: ELG-E
-Subkey-Length: 1024
-Name-Real: Joe Tester
-Name-Email: joe@foo.bar
-Expire-Date: 0
-%commit" | gpg --gen-key --batch
-recipient=joe@foo.bar
-echo hai | gpg -es -r $recipient | gpg -d
+recipient=joe@foo.bar # see test/harness
 
 sudo zfs snapshot $pool/data@1
 snapshot=$pool/data@1 name=firstbackup gdrive_folder=$testfolder recipient=$recipient haven-b-backup > $report1

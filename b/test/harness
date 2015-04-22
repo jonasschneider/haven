@@ -10,12 +10,26 @@ if [ -n "${CI:-}" ]; then
   export PATH="$PATH:$GOPATH/bin"
 
   go get github.com/tools/godep
-  sudo apt-get install buffer gnupg-agent
+  sudo apt-add-repository --yes ppa:zfs-native/stable
+  sudo apt-get update
+  sudo apt-get install buffer gnupg-agent spl-dkms zfs-dkms ubuntu-zfs
 
-  # hi there, gpg
+  # ehehehe
   sudo rm /dev/random
   sudo ln -s /dev/urandom /dev/random
 fi
+
+# generate a gpg key
+export GNUPGHOME=$(mktemp -d /tmp/gpgXXXXXX)
+echo "Key-Type: RSA
+Key-Length: 1024
+Subkey-Type: ELG-E
+Subkey-Length: 1024
+Name-Real: Joe Tester
+Name-Email: joe@foo.bar
+Expire-Date: 0
+%commit" | gpg --gen-key --batch
+echo hai | gpg -es -r $recipient | gpg -d
 
 # build & install the thing
 make

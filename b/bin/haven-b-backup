@@ -24,7 +24,7 @@ sizefile=$(mktemp /tmp/sizefileXXXXXXXXX)
 idfile=$(mktemp /tmp/idfileXXXXXXXXX)
 start_t=$(date)
 
-zfs send $snapshot \
+sudo zfs send $snapshot \
   | tee >(sha256sum > $hashfile) \
   | tee >(wc -c > $sizefile) \
   | xz \

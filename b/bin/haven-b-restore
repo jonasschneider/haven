@@ -1,38 +1,17 @@
 #!/bin/bash
 
-set -eux
+## Make sure to set the following env variables:
+## filename:      name of the file on gdrive, e.g. "2015-04-22-08-46-firstbackup.zfs.xz.gpg"
+## dest_snapshot: name of the ZFS snapshot to write, e.g. "tank@restored-1"
+
+set -eu
 set -o pipefail
 
-spec=$1
-name=$2
-restore_to=$3
-gdrive_folder=$(cat $spec | haven-b-jq --raw-output .gdrive_folder_id)
+# bail if things are missing
+x=$filename
+x=$dest_snapshot
 
-pushd $tmp
-
-if [ -e gdrive_config ]; then
-  echo "gdrive already configured, skipping."
-else
-  mkdir gdrive_config
-  cat $spec | haven-b-jq --raw-output .gdrive_config_config_base64 | base64 -d > gdrive_config/config.json
-  cat $spec | haven-b-jq --raw-output .gdrive_config_token_base64 | base64 -d > gdrive_config/token.json
-fi
-
-# restore data files (non-info)
-GDRIVE_CONFIG_DIR="$tmp/gdrive_config" haven-b-gdriverestore $gdrive_folder
-
-# write out the info file (containing the backup key)
-cat $spec | haven-b-jq --raw-output .zbackup_info_base64 | base64 -d > info
-popd
-
-mv $tmp/{archived_bundles,bundles}
-
-pwfile=$(mktemp /tmp/haven-pwXXXXX)
-echo $(cat $spec | haven-b-jq --raw-output .zbackup_password) > $pwfile
-
-pushd $restore_to
-haven-b-zbackup restore --password-file $pwfile $tmp/backups/$name | tar x
-rm $pwfile
-# fix file ownership: restore to the current user and effective group id
-chown -R `whoami`:`id -Gn|cut -d ' ' -f 1` *
-popd
+haven-b-download $filename \
+  | gpg -d \
+  | unxz \
+  | sudo zfs recv $dest_snapshot

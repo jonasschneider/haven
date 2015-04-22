@@ -5,49 +5,59 @@ shopt -s dotglob
 testfolder=0B-39XlY-_MIBfklocThEV0Vqamk5YncwUUstWlNNMWpHQVBHNGxoSXdvcGoxSzJVenVNU0E
 
 pool=$1
+report1=$(mktemp /tmp/reportXXXXXX)
+report2=$(mktemp /tmp/reportXXXXXX)
 
 sudo zfs create $pool/data
 sudo chown `whoami` /$pool/data
-report1=$(mktemp /tmp/reportXXXXXX)
-report2=$(mktemp /tmp/reportXXXXXX)
-export GNUPG_HOME=$(mktemp -d /tmp/gpgXXXXXX)
-
 dd if=/dev/urandom of=/$pool/data/x bs=512 count=8
 
+export GNUPGHOME=$(mktemp -d /tmp/gpgXXXXXX)
 echo "Key-Type: RSA
 Key-Length: 1024
 Subkey-Type: ELG-E
 Subkey-Length: 1024
 Name-Real: Joe Tester
-Name-Comment: with stupid passphrase
 Name-Email: joe@foo.bar
 Expire-Date: 0
-Passphrase: abc
 %commit" | gpg --gen-key --batch
 recipient=joe@foo.bar
+echo hai | gpg -es -r $recipient | gpg -d
 
 sudo zfs snapshot $pool/data@1
-sudo env snapshot=$pool/data@1 name=firstbackup gdrive_folder=$testfolder recipient=$recipient haven-b-backup > $report1
+snapshot=$pool/data@1 name=firstbackup gdrive_folder=$testfolder recipient=$recipient haven-b-backup > $report1
+expected1=$(cd /$pool/data; tar c * | sha1sum)
 echo zwei > /$pool/data/x
 sudo zfs snapshot $pool/data@2
-expected=$(cd /$pool/data; tar c * | sha1sum)
-#sudo env snapshot=$pool/data@2 name=secondbackup gdrive_folder=$testfolder recipient=mail@jonasschneider.com haven-b-backup > $report2
+expected2=$(cd /$pool/data; tar c * | sha1sum)
+snapshot=$pool/data@2 name=secondbackup gdrive_folder=$testfolder recipient=$recipient haven-b-backup > $report2
 
 # now, a crash happens
 sleep 2
 sudo zfs destroy -fr $pool/data
 
+cat $report1
 # now attempt to restore
-filename=$(cat $report1|grep "Completed Backup" | cut -d ':' -f 2)
-echo $filename
-#unxz | sudo zfs recv $pool/data@2
+filename=$(cat $report1|grep "In GDrive as" | cut -d ':' -f 2 | sed -e 's/^[[:space:]]*//' -e 's/[[:space:]]*$//')
+filename=$filename dest_snapshot=$pool/rest1data@restored1 haven-b-restore
 
-actual=$(cd /$pool/data/.zfs/snapshot/2; tar c * | sha1sum)
+cat $report2
+filename=$(cat $report2|grep "In GDrive as" | cut -d ':' -f 2 | sed -e 's/^[[:space:]]*//' -e 's/[[:space:]]*$//')
+filename=$filename dest_snapshot=$pool/rest2data@restored2 haven-b-restore
 
-if [ "$expected" != "$actual" ]; then
-  echo expected $expected, but got $actual
+actual1=$(cd /$pool/rest1data/.zfs/snapshot/restored1; tar c * | sha1sum)
+actual2=$(cd /$pool/rest2data/.zfs/snapshot/restored2; tar c * | sha1sum)
+
+if [ "$expected1" != "$actual1" ]; then
+  echo expected $expected1, but got $actual1
+  exit 1
+fi
+
+if [ "$expected2" != "$actual2" ]; then
+  echo expected $expected2, but got $actual2
   exit 1
 fi
 
 sleep 2
-sudo zfs destroy -fr $pool/data
+sudo zfs destroy -fr $pool/rest1data
+sudo zfs destroy -fr $pool/rest2data

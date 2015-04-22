@@ -33,7 +33,7 @@ sudo zfs send $snapshot \
   | haven-b-upload $filename $gdrive_folder \
   > $idfile
 
-thehash=$(cat $hashfile)
+thehash=$(cat $hashfile|cut -f 1 -d ' ')
 rm $hashfile
 thesize=$(cat $sizefile)
 rm $sizefile

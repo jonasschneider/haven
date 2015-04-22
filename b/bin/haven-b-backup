@@ -21,6 +21,7 @@ x=$recipient
 filename=$(date "+%Y-%m-%d-%H-%M")-$name.zfs.xz.gpg
 hashfile=$(mktemp /tmp/hashfileXXXXXXXXX)
 sizefile=$(mktemp /tmp/sizefileXXXXXXXXX)
+idfile=$(mktemp /tmp/idfileXXXXXXXXX)
 start_t=$(date)
 
 zfs send $snapshot \
@@ -30,19 +31,21 @@ zfs send $snapshot \
   | gpg -e -r $recipient --cipher-algo AES256 --compress-algo none \
   | buffer -m 32M -s 512K \
   | haven-b-upload $filename $gdrive_folder \
-  | read gdrive_fileid
+  > $idfile
 
 thehash=$(cat $hashfile)
 rm $hashfile
 thesize=$(cat $sizefile)
 rm $sizefile
+gdrive_fileid=$(cat $idfile)
+rm $idfile
 
 echo "========================================================"
 echo "Completed Backup: $filename"
 echo "Of ZFS snapshot:  $snapshot"
 echo "Stream size:      $thesize"
 echo "Stream sha256sum: $thehash"
-echo "Encrypted to:     $recipient_keyname"
+echo "Encrypted to:     $recipient"
 echo "In GDrive as:     $gdrive_fileid"
 echo "Within folder:    $gdrive_folder"
 echo "Time start:       $start_t"

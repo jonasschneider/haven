@@ -9,12 +9,12 @@ if [ -n "${CI:-}" ]; then
   export GOPATH="$HOME/go"
   export PATH="$PATH:$GOPATH/bin"
 
-  # add the zbackup PPA (it's pretty old but Travis runs ubuntu 12.04)
-  sudo add-apt-repository -y ppa:eugenesan/ppa
-  sudo apt-get update
-
   go get github.com/tools/godep
-  sudo apt-get install jq zbackup
+  sudo apt-get install buffer
+
+  # hi there, gpg
+  sudo rm /dev/random
+  sudo ln -s /dev/urandom /dev/random
 fi
 
 # build & install the thing
@@ -30,11 +30,11 @@ fi
 vdev=$(mktemp /tmp/testpoolvdevXXXXXX)
 dd if=/dev/zero of=$vdev bs=512 count=800000
 pool=$(basename $vdev)
-zpool create $pool $vdev
+sudo zpool create $pool $vdev
 # schedule unlink
 rm $vdev
 
 . test/t-dataroundtrip.sh $pool
 
-zpool destroy $pool
+sudo zpool destroy $pool
 echo "all tests passed!"

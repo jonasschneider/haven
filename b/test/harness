@@ -11,16 +11,8 @@ if [ -n "${CI:-}" ]; then
 
   go get github.com/tools/godep
 
-  # ZFS things
-  sudo apt-add-repository --yes ppa:zfs-native/stable
   sudo apt-get update
-  # do this in stages since otherwise the compilation fails.. sigh
-  sudo apt-get install spl-dkms
-  sudo apt-get install zfs-dkms
-
-  sudo apt-get install buffer gnupg-agent ubuntu-zfs golang
-
-  modprobe zfs
+  sudo apt-get install buffer gnupg-agent golang zfs-fuse
 
   # ehehehe
   sudo rm /dev/random

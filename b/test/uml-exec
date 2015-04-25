@@ -1,0 +1,61 @@
+#!/usr/bin/python
+import serial,os,sys,base64,time
+ser=serial.Serial()
+ser.port = os.environ["HAVEN_B_TEST_UML_PTS"]
+ser.open()
+
+# drain messages
+while ser.inWaiting() > 0:
+  ser.read(1)
+
+if sys.__stdin__.isatty():
+  ser.write("echo -n > /tmp/in\n")
+  ser.readline() # readback
+else:
+  # horribly inefficient, no chunking, rofl
+  indata = sys.stdin.read()
+  ser.write("cat | base64 -w0 -d > /tmp/in\n")
+  ser.write(base64.b64encode(indata))
+  ser.write("\x04")
+  ser.readline() # readback
+  ser.readline() # output echo?
+
+# wait until we get the next prompt
+while ser.inWaiting() == 0:
+  time.sleep(.1)
+
+cmdline=" ".join(sys.argv[1:])
+ser.write(cmdline+" > /tmp/out 2>/tmp/err\n")
+ser.readline() # readback
+
+while ser.inWaiting() == 0:
+  time.sleep(.1)
+
+ser.write("cat /tmp/out| base64 -w0 | wc -c\n")
+ser.readline() # readback
+len = int(ser.readline().strip())
+
+while ser.inWaiting() == 0:
+  time.sleep(.1)
+
+ser.write("cat /tmp/out | base64 -w0\n")
+ser.readline() # readback
+data = ser.read(len)
+sys.stdout.write(base64.b64decode(data))
+
+while ser.inWaiting() == 0:
+  time.sleep(.1)
+
+ser.write("cat /tmp/err| base64 -w0 | wc -c\n")
+ser.readline() # readback
+len = int(ser.readline().strip())
+
+while ser.inWaiting() == 0:
+  time.sleep(.1)
+
+ser.write("cat /tmp/err | base64 -w0\n")
+ser.readline() # readback
+data = ser.read(len)
+sys.stderr.write(base64.b64decode(data))
+
+ser.close()

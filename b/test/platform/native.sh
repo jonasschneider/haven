@@ -1,0 +1,1 @@
+export pool=$(basename $vdev)

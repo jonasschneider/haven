@@ -3,25 +3,26 @@
 set -eux
 set -o pipefail
 
-# Travis CI provisioning..
+# Travis CI provisioning. Flip this flag to enable things that might be unsafe
+# to do on your personal machine. When running in Vagrant, you can safely set
+# CI=true, but you might need to add your own credentials file in
+# ~/.haven-b-gdrivecreds.
 if [ -n "${CI:-}" ]; then
-  openssl aes-256-cbc -K $encrypted_ad436cd0a302_key -iv $encrypted_ad436cd0a302_iv -in .creds.enc -out ~/.haven-b-gdrivecreds -d
-  cat ~/.haven-b-gdrivecreds
-  exit 1
-  export GOPATH="$HOME/go"
-  export PATH="$PATH:$GOPATH/bin"
+  # decrypt Google test credentials, if present
+  if [ -n "${encrypted_ad436cd0a302_key:-}" ]; then
+    openssl aes-256-cbc -K $encrypted_ad436cd0a302_key -iv $encrypted_ad436cd0a302_iv -in .creds.enc -out ~/.haven-b-gdrivecreds -d
+  fi
 
-  go get github.com/tools/godep
+  # install OS dependencies
+  #sudo apt-get update
+  sudo apt-get install buffer gnupg-agent golang git curl xz-utils coreutils gdb
 
-  sudo apt-get update
-  sudo apt-get install buffer gnupg-agent golang zfs-fuse
-
-  # ehehehe
+  # totally screw up /dev/random so we can generate test gpg keys without waiting forever
   sudo rm /dev/random
   sudo ln -s /dev/urandom /dev/random
 fi
 
-# generate a gpg key
+# generate a gpg key to encrypt our test backups to
 export GNUPGHOME=$(mktemp -d /tmp/gpgXXXXXX)
 echo "Key-Type: RSA
 Key-Length: 1024
@@ -33,18 +34,28 @@ Expire-Date: 0
 %commit" | gpg --gen-key --batch
 echo hai | gpg -es -r joe@foo.bar | gpg -d > /dev/null # make sure it works
 
-# build & install the thing
+# install godep
+export GOPATH=`pwd`/test/go
+export PATH="$PATH:$GOPATH/bin"
+go get github.com/tools/godep
+
+# build & install haven code
 make
 sudo make install
 
+# platform runtime setup (create the pool)
 vdev=$(mktemp /tmp/testpoolvdevXXXXXX)
-dd if=/dev/zero of=$vdev bs=512 count=800000
-pool=$(basename $vdev)
+dd if=/dev/zero of=$vdev bs=512 count=$((2*1024*100))
+eval "$(cat test/platform/uml.sh)"
 sudo zpool create $pool $vdev
-# schedule unlink
-rm $vdev
 
+# run tests
 . test/t-dataroundtrip.sh $pool
 
+# clean up
+rm $vdev
+if [ -n "${kill_me:-}" ];
+  kill $kill_me
+fi
 set +x
 echo "all tests passed!"

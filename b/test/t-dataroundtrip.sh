@@ -9,16 +9,15 @@ report1=$(mktemp /tmp/reportXXXXXX)
 report2=$(mktemp /tmp/reportXXXXXX)
 
 sudo zfs create $pool/data
-sudo chown `whoami` /$pool/data
-dd if=/dev/urandom of=/$pool/data/x bs=512 count=8
+sudo dd if=/dev/urandom of=/$pool/data/x bs=512 count=8
 recipient=joe@foo.bar # see test/harness
 
 sudo zfs snapshot $pool/data@1
 snapshot=$pool/data@1 name=firstbackup gdrive_folder=$testfolder recipient=$recipient haven-b-backup > $report1
-expected1=$(cd /$pool/data; tar c * | sha1sum)
-echo zwei > /$pool/data/x
+expected1=$(sudo bash -c "cd /$pool/data; tar c * | sha1sum")
+sudo bash -c "echo zwei > /$pool/data/x"
 sudo zfs snapshot $pool/data@2
-expected2=$(cd /$pool/data; tar c * | sha1sum)
+expected2=$(sudo bash -c "cd /$pool/data; tar c * | sha1sum")
 snapshot=$pool/data@2 name=secondbackup gdrive_folder=$testfolder recipient=$recipient haven-b-backup > $report2
 
 # now, a crash happens
@@ -46,8 +45,8 @@ checkout1=/$pool/rest1datasnap
 sudo zfs clone $pool/rest2data@restored2 $pool/rest2datasnap
 checkout2=/$pool/rest2datasnap
 
-actual1=$(cd $checkout1; tar c * | sha1sum)
-actual2=$(cd $checkout2; tar c * | sha1sum)
+actual1=$(sudo bash -c "cd $checkout1; tar c * | sha1sum")
+actual2=$(sudo bash -c "cd $checkout2; tar c * | sha1sum")
 
 if [ "$expected1" != "$actual1" ]; then
   echo expected $expected1, but got $actual1

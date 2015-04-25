@@ -1,5 +1,8 @@
 #!/usr/bin/python
-import serial,os,sys,base64,time
+# escaping isn't perfect, be careful! especially with '
+
+import serial,os,sys,base64,time,textwrap
+
 ser=serial.Serial()
 ser.port = os.environ["HAVEN_B_TEST_UML_PTS"]
 ser.open()
@@ -12,27 +15,37 @@ if sys.__stdin__.isatty():
   ser.write("echo -n > /tmp/in\n")
   ser.readline() # readback
 else:
+  ser.write("stty -echo\n")
   # horribly inefficient, no chunking, rofl
-  indata = sys.stdin.read()
-  ser.write("cat | base64 -w0 -d > /tmp/in\n")
-  ser.write(base64.b64encode(indata))
+  indata = "\n".join(textwrap.wrap(base64.b64encode(sys.stdin.read())))
+  ser.write("cat | base64 -d > /tmp/in\n")
+  ser.write(indata+"\n")
   ser.write("\x04")
-  ser.readline() # readback
-  ser.readline() # output echo?
+  ser.read(1)
+  # drain prompt
+  while ser.inWaiting() > 0:
+    ser.read(1)
+  ser.write("stty echo\n")
+  ser.write("date\n")
+  ser.readline()
+  ser.readline()
+  #print "echo", ser.read(len(indata)) # input echo
 
 # wait until we get the next prompt
 while ser.inWaiting() == 0:
   time.sleep(.1)
 
-cmdline=" ".join(sys.argv[1:])
-ser.write(cmdline+" > /tmp/out 2>/tmp/err\n")
-ser.readline() # readback
+def wrap(s): return '"'+s.replace('"','\\"'+'"')+'"'
+cmdline=" ".join(map(wrap, sys.argv[1:]))
+cmd="bash -c '"+cmdline+"' < /tmp/in > /tmp/out 2>/tmp/err\n"
+ser.write(cmd)
+ser.readline()
 
 while ser.inWaiting() == 0:
   time.sleep(.1)
 
 ser.write("cat /tmp/out| base64 -w0 | wc -c\n")
-ser.readline() # readback
+ser.readline()
 len = int(ser.readline().strip())
 
 while ser.inWaiting() == 0:
@@ -57,5 +70,8 @@ ser.write("cat /tmp/err | base64 -w0\n")
 ser.readline() # readback
 data = ser.read(len)
 sys.stderr.write(base64.b64decode(data))
+
+while ser.inWaiting() == 0:
+  time.sleep(.1)
 
 ser.close()

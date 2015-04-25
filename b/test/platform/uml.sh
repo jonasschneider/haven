@@ -39,6 +39,7 @@ ser.port='$linuxtty'
 ser.open()
 while True:
   time.sleep(1)" &
+watcherpid=$!
 
 # so that exec works
 export HAVEN_B_TEST_UML_PTS=$linuxtty
@@ -46,10 +47,12 @@ export HAVEN_B_TEST_UML_PTS=$linuxtty
 test/uml-exec mount -t proc proc /proc
 test/uml-exec zpool status |& grep "no pools available"
 
-# enable aliases, and replace sudo with running things in the UML
-shopt -s expand_aliases
-alias sudo="`pwd`/test/uml-exec"
+# could do it with an alias, but then it doesn't work in subprocesses that use shell
+lepath=$(mktemp -d /tmp/tempXXXXXX)
+cp test/uml-exec $lepath/sudo
+export PATH="$lepath:$PATH"
 
 pool=diving
 vdev=/dev/ubdb # conform to the inner file system
-kill_me=$linuxpid
+kill_me_1=$linuxpid
+kill_me_2=$watcherpid

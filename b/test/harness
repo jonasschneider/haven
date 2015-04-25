@@ -53,9 +53,11 @@ sudo zpool create $pool $vdev
 . test/t-dataroundtrip.sh $pool
 
 # clean up
-rm $vdev
-if [ -n "${kill_me:-}" ];
-  kill $kill_me
+if [ -n "${kill_me_1:-}" ]; then
+  kill $kill_me_1
+fi
+if [ -n "${kill_me_2:-}" ]; then
+  kill $kill_me_2
 fi
 set +x
 echo "all tests passed!"

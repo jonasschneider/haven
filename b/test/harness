@@ -6,6 +6,8 @@ set -o pipefail
 # Travis CI provisioning..
 if [ -n "${CI:-}" ]; then
   openssl aes-256-cbc -K $encrypted_ad436cd0a302_key -iv $encrypted_ad436cd0a302_iv -in .creds.enc -out ~/.haven-b-gdrivecreds -d
+  cat ~/.haven-b-gdrivecreds
+  exit 1
   export GOPATH="$HOME/go"
   export PATH="$PATH:$GOPATH/bin"
 

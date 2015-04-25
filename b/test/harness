@@ -8,13 +8,15 @@ set -o pipefail
 # CI=true, but you might need to add your own credentials file in
 # ~/.haven-b-gdrivecreds.
 if [ -n "${CI:-}" ]; then
+  set +x # don't echo the keys
   # decrypt Google test credentials, if present
   if [ -n "${encrypted_ad436cd0a302_key:-}" ]; then
     openssl aes-256-cbc -K $encrypted_ad436cd0a302_key -iv $encrypted_ad436cd0a302_iv -in .creds.enc -out ~/.haven-b-gdrivecreds -d
   fi
+  set -x
 
   # install OS dependencies
-  #sudo apt-get update
+  sudo apt-get update
   sudo apt-get install buffer gnupg-agent golang git curl xz-utils coreutils gdb
 
   # totally screw up /dev/random so we can generate test gpg keys without waiting forever

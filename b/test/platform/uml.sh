@@ -29,8 +29,8 @@ test/haven-b-test-linux-v1 \
 linuxpid=$!
 
 # find out which pty we spawned it on... ouch
-sleep 1
-linuxtty=$(sudo gdb --batch --pid $linuxpid -ex "print /s ptsname(12)" 2> /dev/null|grep buffer|sed 's/^[^\"]*\"//' | sed 's/\".*//')
+# requires yama ptrace = 0
+linuxtty=$(gdb --batch --pid $linuxpid -ex "print /s ptsname(12)" 2> /dev/null|grep buffer|sed 's/^[^\"]*\"//' | sed 's/\".*//')
 
 # spawn this to keep the console open.. sigh
 python -c "import serial,os,sys,time

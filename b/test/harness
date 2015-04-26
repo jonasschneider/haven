@@ -16,12 +16,15 @@ if [ -n "${CI:-}" ]; then
   set -x
 
   # install OS dependencies
-  sudo apt-get update
+  #sudo apt-get update
   sudo apt-get install buffer gnupg-agent golang git curl xz-utils coreutils gdb
 
   # totally screw up /dev/random so we can generate test gpg keys without waiting forever
   sudo rm /dev/random
   sudo ln -s /dev/urandom /dev/random
+
+  # enable arbitrary ptrace'ing.. hooray
+  echo 0 | sudo tee /proc/sys/kernel/yama/ptrace_scope
 fi
 
 # generate a gpg key to encrypt our test backups to
@@ -48,7 +51,7 @@ sudo make install
 # platform runtime setup (create the pool)
 vdev=$(mktemp /tmp/testpoolvdevXXXXXX)
 dd if=/dev/zero of=$vdev bs=512 count=$((2*1024*100))
-eval "$(cat test/platform/uml.sh)"
+source test/platform/uml.sh
 sudo zpool create $pool $vdev
 
 # run tests

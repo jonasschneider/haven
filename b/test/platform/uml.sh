@@ -14,11 +14,6 @@ chmod +x test/haven-b-test-linux-v1
 rootfs_cow=$(mktemp /tmp/testrootfscowXXXXXX)
 rm $rootfs_cow # need it to be absent, else COW gets confused
 
-cmd="zpool create diving /dev/ubdb"
-
-script=$(mktemp /tmp/testscriptXXXXXX)
-echo "date" > $script
-
 test/haven-b-test-linux-v1 \
   ubd0=$rootfs_cow,test/haven-b-test-rootfs-v1.ext4 \
   ubd1=$vdev \
@@ -44,16 +39,22 @@ while True:
   time.sleep(1)" &
 watcherpid=$!
 
-# so that exec works
+# tell uml-exec where to send commands
 export HAVEN_B_TEST_UML_PTS=$linuxtty
 
+# mount proc and do a sanity check to make sure the kernel module
+# can be loaded
 test/scripts/uml-exec mount -t proc proc /proc
 test/scripts/uml-exec zpool status |& grep "no pools available"
 
-# could do it with an alias, but then it doesn't work in subprocesses that use shell
+# override sudo to run as root inside the UML
+# this is of course a pretty leaky abstraction, but it works
+# if you assume that the sets of data read by sudo and non-sude are non-overlapping.
 lepath=$(mktemp -d /tmp/tempXXXXXX)
 ln -s `pwd`/test/scripts/uml-exec $lepath/sudo
 export PATH="$lepath:$PATH"
+# could do it with an alias, but then it doesn't work with subprocesses that
+# use sudo (which we have)
 
 pool=diving
 vdev=/dev/ubdb # conform to the inner file system

@@ -45,6 +45,9 @@ go get github.com/tools/godep
 make
 sudo make install
 
+# test packaging
+make package
+
 # platform runtime setup (create the pool)
 vdev=$(mktemp /tmp/testpoolvdevXXXXXX)
 dd if=/dev/zero of=$vdev bs=512 count=$((2*1024*100))

@@ -13,16 +13,15 @@ pkgs=$(pkgtgz) $(pkgtxz)
 
 all: $(executables)
 
-pkg: $(pkgs)
+package: $(pkgs)
 
-$(pkgtgz): $(executables) pkg
-	tar --transform "s,^out,/$(pkgbase)/," -cxf $@ $^
+$(pkgtgz): $(executables)
+	mkdir -p pkg
+	tar --transform "s,^out,/$(pkgbase)/," -czf $@ $^
 
 $(pkgtxz): $(executables) pkg
+	mkdir -p pkg
 	tar --transform "s,^out,/$(pkgbase)/," -cJf $@ $^
-
-pkg:
-	mkdir $@
 
 .SECONDEXPANSION:
 $(outgo): out/%: $$(notdir $$*)/*.go

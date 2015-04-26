@@ -1,6 +1,8 @@
 sudo: true
 env:
-  - STRATEGY_UNDER_TEST=b
+  - STRATEGY_UNDER_TEST=b HAVEN_B_TEST_PLATFORM=uml
+  # can't test native right now because Travis won't let us install the ZFS kernel module
+  #- STRATEGY_UNDER_TEST=b HAVEN_B_TEST_PLATFORM=native
 
 script: cd $STRATEGY_UNDER_TEST; exec test/harness
 

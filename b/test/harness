@@ -17,7 +17,8 @@ if [ -n "${CI:-}" ]; then
 
   # install OS dependencies
   sudo apt-get update
-  sudo apt-get install buffer gnupg-agent golang git curl xz-utils coreutils gdb python-serial
+  sudo apt-get -y install buffer gnupg-agent xz-utils coreutils # runtime!
+  sudo apt-get -y install golang git curl gdb python-serial # build
 
   # totally screw up /dev/random so we can generate test gpg keys without waiting forever
   sudo rm /dev/random
@@ -51,7 +52,7 @@ make package
 # platform runtime setup (create the pool)
 vdev=$(mktemp /tmp/testpoolvdevXXXXXX)
 dd if=/dev/zero of=$vdev bs=512 count=$((2*1024*100))
-source test/platform/uml.sh
+source test/platform/${HAVEN_B_TEST_PLATFORM:-uml}.sh
 sudo zpool create $pool $vdev
 
 # run tests

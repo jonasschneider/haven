@@ -16,7 +16,7 @@ if [ -n "${CI:-}" ]; then
   set -x
 
   # install OS dependencies
-  #sudo apt-get update
+  sudo apt-get update
   sudo apt-get install buffer gnupg-agent golang git curl xz-utils coreutils gdb
 
   # totally screw up /dev/random so we can generate test gpg keys without waiting forever

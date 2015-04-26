@@ -30,6 +30,7 @@ linuxpid=$!
 
 # find out which pty we spawned it on... ouch
 # requires yama ptrace = 0
+sleep 1
 linuxtty=$(gdb --batch --pid $linuxpid -ex "print /s ptsname(12)" 2> /dev/null|grep buffer|sed 's/^[^\"]*\"//' | sed 's/\".*//')
 
 # spawn this to keep the console open.. sigh

@@ -19,7 +19,7 @@ $(pkgtgz): $(executables)
 	mkdir -p pkg
 	tar --transform "s,^out,/$(pkgbase)/," -czf $@ $^
 
-$(pkgtxz): $(executables) pkg
+$(pkgtxz): $(executables)
 	mkdir -p pkg
 	tar --transform "s,^out,/$(pkgbase)/," -cJf $@ $^
 

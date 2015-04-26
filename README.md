@@ -56,9 +56,8 @@ Haven assumes an environment roughly conforming to this description:
 
 | Strategy | Trigger | Deduplicator | Uploader                    | Storage Provider | Storage costs                 | Realtime restore |
 |----------|---------|--------------|-----------------------------|------------------|-------------------------------|------------------|
-| **A**        | Cron    | Duplicity    | Duplicity (OpenStack Swift) | hubiC            | 0.001€/GB/mo (10TB at 10€/mo) | ✓                |
-| **B**        | Cron    | ZBackup      | (custom)                    | Google Drive     | 0.01$/GB/mo (1TB at 10$/mo)   | ✓                |
-| **C**        | Cron    | ZFS          | s3cmd                       | Amazon S3        | 0.01$/GB/mo (flexible)        | very slow        |
+| **A**        | Cron    | Duplicity    | Duplicity               | hubiC            | 0.001€/GB/mo (10TB at 10€/mo) | ✓                |
+| **B**        | Cron    | ZFS          | (custom)                    | Google Drive     | 0.01$/GB/mo (1TB at 10$/mo)   | ✓                |
 
 ## Backup strategy A (`a/`)
 - Cronjob
@@ -77,28 +76,21 @@ trust Duplicity to do its work or occasionally try a restore yourself.
 
 ## Backup strategy B (`b/`)
 - Cronjob
-- [ZBackup](https://github.com/zbackup/zbackup)
-- (custom sync to) Google Drive
+- `zfs send | xz | gpg | haven-b-upload`
+- Upload to [Google Drive](https://drive.google.com/drive/u/0/my-drive) (via custom uploader)
 
-ZBackup is a deduplicating backup tool. It provides a very simple interface
-which you can just pipe huge files into -- we feed it a tar archive of all our
-data. ZBackup calculates a rolling checksum of the data and references any
-sections already seen. This results in global deduplication. There is a bit of
-tooling built around zbackup in order to integrate it with Google Drive and to
-split a huge backup into partial backups so file transfer can begin before
-ZBackup has committed the entire backup to its local repository.
-
-## Backup strategy C (not yet implemented)
-- Cronjob
-- `zfs send [-i]` -> s3cmd to S3 -> Glacier
-
-This might be a good idea to implement in the future. We previously
+Since ZFS is assumed to be the file system storing the live data, we can
+exploit some of its unique features, like snapshots. We previously
 experimented with sending ZFS snapshots to Amazon EC2 instances and using EBS
-snapshots as long-term storage. However, EBS pricing prohibits this method
-from working on very large datasets. Also, sending data to EC2 unencrypted
-violates our threat model. The alternative is to `zfs send` the (maybe-
-incremental) snapshot but simply compress and pipe it into `s3cmd`, a tool to
-upload files to Amazon S3. It can accept large uploads from stdin without
-having the entire file on disk. That way, we can get our snapshots onto S3 and
-then use Amazon's Lifecycle Policies to immediately migrate all the data to
-Glacier, where storage is only $0.01/GB/mo.
+snapshots of the vdevs as long-term storage. However, EBS pricing makes this method
+prohibitively expensive for large datasets. Also, sending data to EC2
+unencrypted violates our threat model.
+
+The alternative is to `zfs send` the snapshot itself but simply compress, encrypt and
+store it as a single giant file. This makes it impossible to lose parts of the
+file without us immediately noticing (unlike Duplicity's volume system). We
+can verify the snapshot by taking a huge hash over the entire stream, which we
+can calculate efficiently without using any disk. In addition, Google Drive
+provides md5summed uploads, which cause us to immediately detect corruption
+during the upload, without having to finish the upload first. They also take
+an md5 over the entire uploaded file, which we can access and verify.

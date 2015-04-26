@@ -50,7 +50,7 @@ test/scripts/uml-exec zpool status |& grep "no pools available"
 
 # could do it with an alias, but then it doesn't work in subprocesses that use shell
 lepath=$(mktemp -d /tmp/tempXXXXXX)
-ln -s test/scripts/uml-exec $lepath/sudo
+ln -s `pwd`/test/scripts/uml-exec $lepath/sudo
 export PATH="$lepath:$PATH"
 
 pool=diving

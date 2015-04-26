@@ -29,9 +29,11 @@ test/haven-b-test-linux-v1 \
 linuxpid=$!
 
 # find out which pty we spawned it on... ouch
-# requires yama ptrace = 0
+# - we can't use gdb since travis doesn't allow setting the yama ptrace scope
+# - we can't use an external thing calling ptsname on /proc/X/fd/Y since that will alloc a new pty
+# soo.. sigh and just use the most recent one... i wonder if this even works
 sleep 1
-linuxtty=$(gdb --batch --pid $linuxpid -ex "print /s ptsname(12)" 2> /dev/null|grep buffer|sed 's/^[^\"]*\"//' | sed 's/\".*//')
+linuxtty=$(ls /dev/pts/*|grep -v ptmx|sort -n|tail -1)
 
 # spawn this to keep the console open.. sigh
 python -c "import serial,os,sys,time

@@ -17,7 +17,7 @@ if [ -n "${CI:-}" ]; then
 
   # install OS dependencies
   sudo apt-get update
-  sudo apt-get install buffer gnupg-agent golang git curl xz-utils coreutils gdb
+  sudo apt-get install buffer gnupg-agent golang git curl xz-utils coreutils gdb python-serial
 
   # totally screw up /dev/random so we can generate test gpg keys without waiting forever
   sudo rm /dev/random

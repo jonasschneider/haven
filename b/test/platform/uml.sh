@@ -45,12 +45,12 @@ watcherpid=$!
 # so that exec works
 export HAVEN_B_TEST_UML_PTS=$linuxtty
 
-test/uml-exec mount -t proc proc /proc
-test/uml-exec zpool status |& grep "no pools available"
+test/scripts/uml-exec mount -t proc proc /proc
+test/scripts/uml-exec zpool status |& grep "no pools available"
 
 # could do it with an alias, but then it doesn't work in subprocesses that use shell
 lepath=$(mktemp -d /tmp/tempXXXXXX)
-cp test/uml-exec $lepath/sudo
+ln -s test/scripts/uml-exec $lepath/sudo
 export PATH="$lepath:$PATH"
 
 pool=diving

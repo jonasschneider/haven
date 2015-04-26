@@ -3,31 +3,63 @@
 set -eux
 set -o pipefail
 
-# Travis CI provisioning..
+# Travis CI provisioning. Flip this flag to enable things that might be unsafe
+# to do on your personal machine. When running in Vagrant, you can safely set
+# CI=true, but you might need to add your own credentials file in
+# ~/.haven-b-gdrivecreds.
 if [ -n "${CI:-}" ]; then
-  openssl aes-256-cbc -K $encrypted_0cf3493bd01c_key -iv $encrypted_0cf3493bd01c_iv -in .env.enc -out .env -d
-  export GOPATH="$HOME/go"
-  export PATH="$PATH:$GOPATH/bin"
+  set +x # don't echo the keys
+  # decrypt Google test credentials, if present
+  if [ -n "${encrypted_ad436cd0a302_key:-}" ]; then
+    openssl aes-256-cbc -K $encrypted_ad436cd0a302_key -iv $encrypted_ad436cd0a302_iv -in .creds.enc -out ~/.haven-b-gdrivecreds -d
+  fi
+  set -x
 
-  # add the zbackup PPA (it's pretty old but Travis runs ubuntu 12.04)
-  sudo add-apt-repository -y ppa:eugenesan/ppa
+  # install OS dependencies
   sudo apt-get update
+  sudo apt-get install buffer gnupg-agent golang git curl xz-utils coreutils gdb python-serial
 
-  go get github.com/tools/godep
-  sudo apt-get install jq zbackup
+  # totally screw up /dev/random so we can generate test gpg keys without waiting forever
+  sudo rm /dev/random
+  sudo ln -s /dev/urandom /dev/random
 fi
 
-# build & install the thing
+# generate a gpg key to encrypt our test backups to
+export GNUPGHOME=$(mktemp -d /tmp/gpgXXXXXX)
+echo "Key-Type: RSA
+Key-Length: 1024
+Subkey-Type: ELG-E
+Subkey-Length: 1024
+Name-Real: Joe Tester
+Name-Email: joe@foo.bar
+Expire-Date: 0
+%commit" | gpg --gen-key --batch
+echo hai | gpg -es -r joe@foo.bar | gpg -d > /dev/null # make sure it works
+
+# install godep
+export GOPATH=`pwd`/test/go
+export PATH="$PATH:$GOPATH/bin"
+go get github.com/tools/godep
+
+# build & install haven code
 make
 sudo make install
 
-# load env variables if present
-if [ -e .env ]; then
-  source .env
-  export $(cut -d= -f1 .env)
+# platform runtime setup (create the pool)
+vdev=$(mktemp /tmp/testpoolvdevXXXXXX)
+dd if=/dev/zero of=$vdev bs=512 count=$((2*1024*100))
+source test/platform/uml.sh
+sudo zpool create $pool $vdev
+
+# run tests
+. test/t-dataroundtrip.sh $pool
+
+# clean up
+if [ -n "${kill_me_1:-}" ]; then
+  kill $kill_me_1
 fi
-
-. test/t-dataroundtrip.sh
-. test/t-resumerestore.sh
-
+if [ -n "${kill_me_2:-}" ]; then
+  kill $kill_me_2
+fi
+set +x
 echo "all tests passed!"

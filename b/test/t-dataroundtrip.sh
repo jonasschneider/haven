@@ -2,30 +2,58 @@ set -eux
 set -o pipefail
 shopt -s dotglob
 
-tmp=$(mktemp -d /tmp/haven-testXXXXX)
-repo=$tmp/repo
-data=$tmp/data
-mkdir $data
-dd if=/dev/urandom of=$data/x bs=512 count=8
+testfolder=0B-39XlY-_MIBfklocThEV0Vqamk5YncwUUstWlNNMWpHQVBHNGxoSXdvcGoxSzJVenVNU0E
 
-gdrive_folder_name="haven-test $(date)"
-haven-b-init $repo $gdrive_folder_name > $tmp/backupspec.json
+pool=$1
+report1=$(mktemp /tmp/reportXXXXXX)
+report2=$(mktemp /tmp/reportXXXXXX)
 
-haven-b-backup $tmp/backupspec.json $data firstbackup
-haven-b-backup $tmp/backupspec.json $data secondbackup
+sudo zfs create $pool/data
+sudo dd if=/dev/urandom of=/$pool/data/x bs=512 count=8
+recipient=joe@foo.bar # see test/harness
+
+sudo zfs snapshot $pool/data@1
+snapshot=$pool/data@1 name=firstbackup gdrive_folder=$testfolder recipient=$recipient haven-b-backup > $report1
+expected1=$(sudo bash -c "cd /$pool/data; tar c * | sha1sum")
+sudo bash -c "echo zwei > /$pool/data/x"
+sudo zfs snapshot $pool/data@2
+expected2=$(sudo bash -c "cd /$pool/data; tar c * | sha1sum")
+snapshot=$pool/data@2 name=secondbackup gdrive_folder=$testfolder recipient=$recipient haven-b-backup > $report2
 
 # now, a crash happens
-rm -fr $tmp/repo
+sleep 2
+sudo zfs destroy -fr $pool/data
 
+cat $report1
 # now attempt to restore
-haven-b-restore $tmp/backupspec.json secondbackup $tmp/restored
+filename=$(cat $report1|grep "In GDrive as" | cut -d ':' -f 2 | sed -e 's/^[[:space:]]*//' -e 's/[[:space:]]*$//')
+filename=$filename dest_snapshot=$pool/rest1data@restored1 haven-b-restore
 
-expected=$(cd $data; tar c * | sha1sum)
-actual=$(cd $tmp/restored; tar c * | sha1sum)
+cat $report2
+filename=$(cat $report2|grep "In GDrive as" | cut -d ':' -f 2 | sed -e 's/^[[:space:]]*//' -e 's/[[:space:]]*$//')
+filename=$filename dest_snapshot=$pool/rest2data@restored2 haven-b-restore
 
-if [ "$expected" != "$actual" ]; then
-  echo expected $expected, but got $actual
+# zfs-fuse doesn't implement .zfs (this makes me sad, but we can't run ZoL on travis)
+# what we'd want is this:
+#
+#     checkout1=/$pool/rest1data/.zfs/snapshot/restored1
+#
+# But we'll have to work around by creating a clone of the snapshot so we can see it.. sigh
+sudo zfs clone $pool/rest1data@restored1 $pool/rest1datasnap
+checkout1=/$pool/rest1datasnap
+
+sudo zfs clone $pool/rest2data@restored2 $pool/rest2datasnap
+checkout2=/$pool/rest2datasnap
+
+actual1=$(sudo bash -c "cd $checkout1; tar c * | sha1sum")
+actual2=$(sudo bash -c "cd $checkout2; tar c * | sha1sum")
+
+if [ "$expected1" != "$actual1" ]; then
+  echo expected $expected1, but got $actual1
   exit 1
 fi
 
-rm -fr $tmp
+if [ "$expected2" != "$actual2" ]; then
+  echo expected $expected2, but got $actual2
+  exit 1
+fi

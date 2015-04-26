@@ -1,4 +1,4 @@
 .vagrant
-.env
 out
 pkg
+_go

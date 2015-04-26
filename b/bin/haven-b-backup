@@ -1,64 +1,55 @@
 #!/bin/bash
 
-set -eux
+## Make sure to set the following env variables:
+## snapshot:      name of the zfs snapshot to back up, e.g. "tank@mysnap"
+## name:          filename part to describe the backup, e.g. "tank-at-mysnap"
+## gdrive_folder: Google Drive ID of the folder to put the file into,
+##                e.g. "0B7l3QydqgCmffi0za0NPMnpFbUF" (might be longer)
+## recipient:     GPG keyname of the recipient to encrypt the data to,
+##                e.g. "mail@jonasschneider.com" (make sure that
+##                `echo lol | gpg -e -r $recipient` works)
+
+set -eu
 set -o pipefail
-shopt -s dotglob
 
-spec="$1"
-sourcedir="$2"
-name="$3"
+# bail if things are missing
+x=$snapshot
+x=$name
+x=$gdrive_folder
+x=$recipient
 
-repo=$(cat $spec | haven-b-jq --raw-output .local_repo)
-zbackup_file=$repo/backups/$name
-gdrive_folder=$(cat $spec | haven-b-jq --raw-output .gdrive_folder_id)
+filename=$(date "+%Y-%m-%d-%H-%M")-$name.zfs.xz.gpg
+hashfile=$(mktemp /tmp/hashfileXXXXXXXXX)
+sizefile=$(mktemp /tmp/sizefileXXXXXXXXX)
+metafile=$(mktemp /tmp/idfileXXXXXXXXX)
+start_t=$(date)
 
-pwfile=$(mktemp /tmp/haven-pwXXXXX)
-echo $(cat $spec | haven-b-jq --raw-output .zbackup_password) > $pwfile
+sudo zfs send $snapshot \
+  | tee >(sha256sum > $hashfile) \
+  | tee >(wc -c > $sizefile) \
+  | xz \
+  | gpg -e -r $recipient --cipher-algo AES256 --compress-algo none \
+  | buffer -m 32M -s 512K \
+  | haven-b-upload $filename $gdrive_folder \
+  > $metafile
 
-archive() {
-  cd "$sourcedir"
-  tar c *
-}
+thehash=$(cat $hashfile|cut -f 1 -d ' ')
+rm $hashfile
+thesize=$(cat $sizefile)
+rm $sizefile
+read gdrive_fileid gdrive_size gdrive_md5 < $metafile
+rm $metafile
 
-# wait() for a specific PID
-anywait() {
-  set +ex
-  while kill -0 "$1" 2>/dev/null; do
-      sleep 0.5
-  done
-  set -ex
-}
-
-# Start syncing in the background
-syncpidfile="$repo/tmp/syncpid"
-mkdir -p $(dirname $syncpidfile)
-touch $syncpidfile
-pushd $repo
-GDRIVE_CONFIG_DIR="$repo/gdrive_config" EXIT_ON_ABSENT=$syncpidfile haven-b-gdrivesync --archive-and-delete $gdrive_folder &
-syncpid=$!
-popd
-echo $syncpid > $syncpidfile
-
-archive | PWFILE="$pwfile" haven-b-zbackup-splitter $((1024 * 100000)) $zbackup_file haven-b-archive-bundles
-archive | haven-b-zbackup backup --password-file $pwfile $zbackup_file
-haven-b-archive-bundles $zbackup_file
-
-rm $pwfile
-
-echo "Backup done, waiting for Google Drive sync to finish"
-
-# wait for the sync to finish
-rm $syncpidfile # this triggers the exit
-anywait $syncpid
-
-pushd $repo
-# these are here mainly to assert that the dirs are empty
-ls archived_bundles | xargs -n 1 -I {} rmdir archived_bundles/{}
-rmdir bundles
-rmdir tmp
-mkdir bundles # could also do it the other way and only create it before running backup
-
-echo "syncing metadata"
-# finally, archive the metadata
-GDRIVE_CONFIG_DIR="$repo/gdrive_config" haven-b-gdrivesync $gdrive_folder
-popd
+echo "========================================================"
+echo "Completed Backup: $filename"
+echo "Of ZFS snapshot:  $snapshot"
+echo "Stream size:      $thesize"
+echo "Stream sha256sum: $thehash"
+echo "Encrypted to:     $recipient"
+echo "In GDrive as:     $gdrive_fileid"
+echo "With size:        $gdrive_size"
+echo "With MD5:         $gdrive_md5"
+echo "Time start:       $start_t"
+echo "Time end:         $(date)"
+echo "Host:             $(hostname)"
+echo "========================================================"

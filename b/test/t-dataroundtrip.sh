@@ -33,17 +33,8 @@ cat $report2
 filename=$(cat $report2|grep "In GDrive as" | cut -d ':' -f 2 | sed -e 's/^[[:space:]]*//' -e 's/[[:space:]]*$//')
 filename=$filename dest_snapshot=$pool/rest2data@restored2 haven-b-restore
 
-# zfs-fuse doesn't implement .zfs (this makes me sad, but we can't run ZoL on travis)
-# what we'd want is this:
-#
-#     checkout1=/$pool/rest1data/.zfs/snapshot/restored1
-#
-# But we'll have to work around by creating a clone of the snapshot so we can see it.. sigh
-sudo zfs clone $pool/rest1data@restored1 $pool/rest1datasnap
-checkout1=/$pool/rest1datasnap
-
-sudo zfs clone $pool/rest2data@restored2 $pool/rest2datasnap
-checkout2=/$pool/rest2datasnap
+checkout1=/$pool/rest1data/.zfs/snapshot/restored1
+checkout2=/$pool/rest2data/.zfs/snapshot/restored2
 
 actual1=$(sudo bash -c "cd $checkout1; tar c * | sha1sum")
 actual2=$(sudo bash -c "cd $checkout2; tar c * | sha1sum")

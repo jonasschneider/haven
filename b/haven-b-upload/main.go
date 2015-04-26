@@ -390,7 +390,7 @@ func getAuthenticatedClient() (*http.Client, error) {
 	if cacheData, err := ioutil.ReadFile(cachePath); err == nil {
 		err := json.Unmarshal(cacheData, &tok)
 		if err != nil {
-			log.Println("Found malformed data in cache file", cachePath)
+			log.Fatalln("Found malformed data in cache file", cachePath)
 		}
 	}
 
@@ -408,11 +408,11 @@ func getAuthenticatedClient() (*http.Client, error) {
 		// authorized and authenticated by the retrieved token.
 		var code string
 		if _, err := fmt.Scan(&code); err != nil {
-			log.Fatal(err)
+			log.Fatalln(err)
 		}
 		tok, err = config.Exchange(oauth2.NoContext, code)
 		if err != nil {
-			log.Fatal(err)
+			log.Fatalln(err)
 		}
 
 		marshaled, err := json.Marshal(tok)
